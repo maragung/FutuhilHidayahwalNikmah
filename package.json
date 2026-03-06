@@ -13,8 +13,8 @@
     "db:check": "node src/lib/db-check.js"
   },
   "engines": {
-    "node": ">=20.0.0 <23.0.0"
-  },
+  "node": ">=20 <=24"
+},
   "dependencies": {
     "@faker-js/faker": "^8.4.1",
     "bcryptjs": "^2.4.3",
