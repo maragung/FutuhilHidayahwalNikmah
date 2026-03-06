@@ -314,10 +314,6 @@ export default function TambahSantriPage() {
   );
 }
 
-
-export default function TambahSantriPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
