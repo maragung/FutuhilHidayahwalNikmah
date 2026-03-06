@@ -414,10 +414,10 @@ export default function BayarPage() {
                     return (
                       <div
                         key={bulan}
-                        className="p-3 rounded-lg border-2 bg-red-50 border-red-200 text-center cursor-not-allowed"
+                        className="p-3 rounded-lg border-2 bg-purple-50 border-purple-200 text-center cursor-not-allowed"
                       >
-                        <p className="text-sm text-red-500">{nama.substring(0, 3)}</p>
-                        <p className="text-xs text-red-500">✕</p>
+                        <p className="text-sm text-purple-600">{nama.substring(0, 3)}</p>
+                        <p className="text-xs text-purple-600">◯</p>
                       </div>
                     );
                   }
@@ -462,7 +462,7 @@ export default function BayarPage() {
 
               <div className="mb-4 text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
                 <p>Pembayaran wajib berurutan dari bulan yang belum lunas pertama.</p>
-                <p>Bulan sebelum tanggal daftar ditandai merah dan tidak bisa dibayar.</p>
+                <p>Bulan sebelum tanggal daftar ditandai ungu dan tidak bisa dibayar.</p>
               </div>
 
               {/* Nominal & Metode */}

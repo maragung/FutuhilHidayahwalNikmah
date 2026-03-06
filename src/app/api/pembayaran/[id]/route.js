@@ -78,7 +78,7 @@ export async function PUT(request, { params }) {
 
     const selisih = Number(updateData.nominal) - nominalLama;
     if (selisih !== 0) {
-      const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t });
+      const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
       const saldoTerakhir = lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0;
       await JurnalKas.create({
         tgl_transaksi: new Date(),
@@ -135,7 +135,7 @@ export async function DELETE(request, { params }) {
 
     const dataSebelum = pembayaran.toJSON();
 
-    const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t });
+    const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
     const saldoTerakhir = lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0;
 
     await JurnalKas.create({

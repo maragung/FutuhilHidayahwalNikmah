@@ -169,8 +169,9 @@ export default function DanaPage() {
               </thead>
               <tbody>
                 {dana.ringkasan_bulanan.map((bulan, idx) => {
-                  const totalMasuk = (bulan.spp || 0) + (bulan.infak || 0);
-                  const saldoBersih = totalMasuk - (bulan.pengeluaran || 0);
+                  const totalMasuk = bulan.pemasukan_jurnal ?? ((bulan.spp || 0) + (bulan.infak || 0));
+                  const totalKeluar = bulan.pengeluaran_jurnal ?? (bulan.pengeluaran || 0);
+                  const saldoBersih = totalMasuk - totalKeluar;
                   
                   return (
                     <tr key={idx} className="table-row">
@@ -185,7 +186,7 @@ export default function DanaPage() {
                         {formatCurrency(totalMasuk)}
                       </td>
                       <td className="px-4 py-3 text-right text-red-600">
-                        {formatCurrency(bulan.pengeluaran)}
+                        {formatCurrency(totalKeluar)}
                       </td>
                       <td className={`px-4 py-3 text-right font-semibold ${saldoBersih >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {formatCurrency(saldoBersih)}

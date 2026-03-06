@@ -309,11 +309,11 @@ export default function CekPembayaranPage() {
                       return (
                         <div
                           key={bulan}
-                          className="p-4 rounded-lg text-center bg-gray-50 border-2 border-gray-200 opacity-40"
+                          className="p-4 rounded-lg text-center bg-purple-50 border-2 border-purple-200"
                         >
-                          <p className="text-xs text-gray-400 mb-1">{namaBulan[idx]}</p>
-                          <div className="text-2xl text-gray-300">-</div>
-                          <p className="text-xs text-gray-400 mt-1">Belum Terdaftar</p>
+                          <p className="text-xs text-purple-600 mb-1">{namaBulan[idx]}</p>
+                          <div className="text-2xl text-purple-500">◯</div>
+                          <p className="text-xs text-purple-600 mt-1">Belum Terdaftar</p>
                         </div>
                       );
                     }

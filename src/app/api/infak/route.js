@@ -113,6 +113,7 @@ export async function POST(request) {
     const lastJurnal = await JurnalKas.findOne({
       order: [['id', 'DESC']],
       transaction: t,
+      lock: t.LOCK.UPDATE,
     });
     const saldoBerjalan = (lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0) + parseFloat(nominal);
     

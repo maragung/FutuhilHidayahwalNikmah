@@ -258,6 +258,7 @@ export async function POST(request) {
     const lastJurnal = await JurnalKas.findOne({
       order: [['id', 'DESC']],
       transaction: t,
+      lock: t.LOCK.UPDATE,
     });
     let saldoBerjalan = lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0;
     
@@ -303,7 +304,7 @@ export async function POST(request) {
       const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
       await kirimEmailAksiAdmin({
         aksi: 'Pembayaran SPP',
-        deskripsi: `Pembayaran SPP ${bulan_list.length} bulan untuk ${santri.nama_lengkap}`,
+        deskripsi: `Pembayaran SPP ${bulanList.length} bulan untuk ${santri.nama_lengkap}`,
         detail: `<table style="width:100%;border-collapse:collapse;margin-top:10px;">
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Santri</strong></td><td style="padding:5px;border:1px solid #ddd;">${santri.nama_lengkap} (${santri.nik})</td></tr>
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Bulan</strong></td><td style="padding:5px;border:1px solid #ddd;">${bulanList.join(', ')}/${tahunInt}</td></tr>
