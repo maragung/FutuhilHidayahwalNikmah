@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import Admin from '@/lib/models/Admin';
 import sequelize from '@/lib/db';
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { createBackup } from '@/lib/utils';
+import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 // POST - Set atau update PIN sendiri
 export async function POST(request) {
@@ -32,6 +32,20 @@ export async function POST(request) {
     admin.pin = new_pin;
     await admin.save();
 
+    // Backup & notifikasi perubahan PIN
+    try {
+      await createBackup('Ubah PIN', 'admins', { id: admin.id, pin: '(lama)' }, { id: admin.id, pin: '(baru)' }, auth.user.id);
+      const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
+      await kirimEmailAksiAdmin({
+        aksi: 'PIN Akun Diubah',
+        deskripsi: `PIN akun ${admin.nama_lengkap} telah diperbarui melalui halaman Akun.`,
+        detail: '',
+        adminNama: admin.nama_lengkap,
+        adminJabatan: admin.jabatan || 'Admin',
+        emailTujuan,
+      });
+    } catch (e) { console.error('Log/email PIN error:', e); }
+
     return NextResponse.json({ success: true, pesan: 'PIN berhasil diperbarui' });
   } catch (error) {
     console.error('Set PIN error:', error);
@@ -53,8 +67,6 @@ export async function PUT(request) {
 
     const body = await request.json();
     if (!body.pin) return NextResponse.json({ success: false, pesan: 'PIN wajib diisi' }, { status: 400 });
-
-    await wait(3000);
 
     if (!admin.pin) {
       return NextResponse.json({ success: false, pesan: 'PIN belum diatur. Silakan atur PIN terlebih dahulu.', has_pin: false }, { status: 400 });

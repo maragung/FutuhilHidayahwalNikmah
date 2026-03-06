@@ -104,7 +104,7 @@ export async function POST(request) {
 
     // Jurnal kas hanya jika kegiatan digabung ke saldo utama
     if (kegiatan.gabung_saldo_utama) {
-      const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']] });
+      const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t });
       const saldoBerjalan = (lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0) + nominalFinal;
 
       await JurnalKas.create({

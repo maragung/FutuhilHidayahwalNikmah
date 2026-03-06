@@ -71,10 +71,9 @@ export async function POST(request) {
     // PIN verification for the action
     const currentAdmin = await Admin.findByPk(auth.user.id);
     if (!currentAdmin) return NextResponse.json({ success: false, pesan: 'Admin tidak ditemukan' }, { status: 404 });
-    if (body.verify_pin) {
-      const pinValid = await currentAdmin.validPin(body.verify_pin);
-      if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
-    }
+    if (!body.verify_pin) return NextResponse.json({ success: false, pesan: 'PIN wajib diisi' }, { status: 400 });
+    const pinValid = await currentAdmin.validPin(body.verify_pin);
+    if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
     
     if (!nama_lengkap || !jabatan || !email || !password || !username) {
       return NextResponse.json(

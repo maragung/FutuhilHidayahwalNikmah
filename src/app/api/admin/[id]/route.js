@@ -35,11 +35,17 @@ export async function DELETE(request, { params }) {
         { status: 400 }
       );
     }
+
+    // Verifikasi PIN
+    let body = {};
+    try { body = await request.json(); } catch { /* tanpa body */ }
+    const currentAdmin = await Admin.findByPk(auth.user.id);
+    if (!currentAdmin) return NextResponse.json({ success: false, pesan: 'Admin pelaku tidak ditemukan' }, { status: 404 });
+    if (!body.pin) return NextResponse.json({ success: false, pesan: 'PIN wajib diisi' }, { status: 400 });
+    const pinValid = await currentAdmin.validPin(body.pin);
+    if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
     
-    let admin = await Admin.findByPk(id);
-    if (!admin && parseInt(id) === auth.user.id && auth.user.email) {
-      admin = await Admin.findOne({ where: { email: auth.user.email } });
-    }
+    const admin = await Admin.findByPk(id);
     if (!admin) {
       return NextResponse.json(
         { success: false, pesan: 'Admin tidak ditemukan' },

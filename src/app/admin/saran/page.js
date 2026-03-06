@@ -13,6 +13,8 @@ export default function SaranPage() {
   const [selectedSaran, setSelectedSaran] = useState(null);
   const [tanggapan, setTanggapan] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [pinModal, setPinModal] = useState({ show: false, action: null, id: null });
+  const [pinInput, setPinInput] = useState('');
 
   useEffect(() => {
     fetchSaran();
@@ -73,7 +75,7 @@ export default function SaranPage() {
     }
   };
 
-  const handleSubmitTanggapan = async () => {
+  const handleSubmitTanggapan = async (pin) => {
     if (!selectedSaran || !tanggapan.trim()) return;
     
     setSubmitLoading(true);
@@ -89,6 +91,7 @@ export default function SaranPage() {
         body: JSON.stringify({
           tanggapan: tanggapan.trim(),
           status: 'Ditindaklanjuti',
+          pin,
         }),
       });
       
@@ -97,20 +100,24 @@ export default function SaranPage() {
         setSelectedSaran(null);
         setTanggapan('');
         fetchSaran();
+      } else {
+        alert(data.pesan || 'Gagal menyimpan tanggapan');
       }
     } catch (err) {
       alert('Gagal menyimpan tanggapan');
     } finally {
       setSubmitLoading(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Yakin ingin menghapus saran ini?')) return;
-    
+    }, pin) => {
     const token = localStorage.getItem('auth_token');
     
     try {
+      const res = await fetch(`/api/saran/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pin }),
       const res = await fetch(`/api/saran/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
@@ -128,6 +135,24 @@ export default function SaranPage() {
     } catch (err) {
       alert('Gagal menghapus saran');
     }
+  };
+
+  const openPinModal = (action, id) => {
+    setPinInput('');
+    setPinModal({ show: true, action, id });
+  };
+
+  const handlePinConfirm = async () => {
+    if (!pinInput.trim()) return;
+    const { action, id: targetId } = pinModal;
+    setPinModal({ show: false, action: null, id: null });
+    
+    if (action === 'tanggapan') {
+      await handleSubmitTanggapan(pinInput);
+    } else if (action === 'delete') {
+      await handleDelete(targetId, pinInput);
+    }
+    setPinInput('');
   };
 
   const getKategoriColor = (kategori) => {
@@ -347,7 +372,10 @@ export default function SaranPage() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={handleSubmitTanggapan}
+                    onClick={() => {
+                      if (!tanggapan.trim()) return;
+                      openPinModal('tanggapan', selectedSaran.id);
+                    }}
                     disabled={!tanggapan.trim() || submitLoading}
                     className="btn-primary flex-1"
                   >
@@ -355,7 +383,7 @@ export default function SaranPage() {
                   </button>
                   
                   <button
-                    onClick={() => handleDelete(selectedSaran.id)}
+                    onClick={() => openPinModal('delete', selectedSaran.id)}
                     className="btn-danger"
                   >
                     🗑️
@@ -392,6 +420,46 @@ export default function SaranPage() {
           )}
         </div>
       </div>
+
+      {/* PIN Confirmation Modal */}
+      {pinModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-2">
+              {pinModal.action === 'delete' ? '🗑️ Konfirmasi Hapus' : '🔐 Konfirmasi PIN'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {pinModal.action === 'delete'
+                ? 'Masukkan PIN untuk menghapus saran ini.'
+                : 'Masukkan PIN untuk menyimpan tanggapan.'}
+            </p>
+            <input
+              type="password"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handlePinConfirm()}
+              placeholder="Masukkan PIN"
+              className="input-field mb-4"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setPinModal({ show: false, action: null, id: null }); setPinInput(''); }}
+                className="btn-secondary flex-1"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handlePinConfirm}
+                disabled={!pinInput.trim()}
+                className={`flex-1 ${pinModal.action === 'delete' ? 'btn-danger' : 'btn-primary'}`}
+              >
+                {pinModal.action === 'delete' ? 'Hapus' : 'Konfirmasi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

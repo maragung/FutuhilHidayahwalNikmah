@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Role } from '@/lib/models';
+import { Role, Admin } from '@/lib/models';
 import sequelize from '@/lib/db';
+import { createBackup } from '@/lib/utils';
+import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 // Roles default sistem (level 1-5 tidak bisa dihapus)
 export const ROLES_DEFAULT = [
@@ -49,7 +51,14 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { nama_role, deskripsi, akses_default } = body;
+    const { nama_role, deskripsi, akses_default, pin } = body;
+
+    // PIN verification
+    const admin = await Admin.findByPk(auth.user.id);
+    if (!admin) return NextResponse.json({ success: false, pesan: 'Admin tidak ditemukan' }, { status: 404 });
+    if (!pin) return NextResponse.json({ success: false, pesan: 'PIN wajib diisi' }, { status: 400 });
+    const pinValid = await admin.validPin(pin);
+    if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
 
     if (!nama_role) {
       return NextResponse.json({ success: false, pesan: 'Nama role wajib diisi' }, { status: 400 });
@@ -67,6 +76,24 @@ export async function POST(request) {
       is_system: false,
       level: 99,
     });
+
+    // Backup
+    await createBackup('Tambah Role', 'roles', null, role.toJSON(), auth.user.id);
+
+    // Kirim salinan email
+    try {
+      const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
+      await kirimEmailAksiAdmin({
+        aksi: 'Role Baru Ditambahkan',
+        deskripsi: `Role baru: ${nama_role}`,
+        detail: '',
+        adminNama: auth.user.nama_lengkap,
+        adminJabatan: auth.user.jabatan,
+        emailTujuan,
+      });
+    } catch (emailErr) {
+      console.error('Gagal kirim email salinan:', emailErr);
+    }
 
     return NextResponse.json({ success: true, pesan: 'Role berhasil ditambahkan', data: role }, { status: 201 });
   } catch (error) {

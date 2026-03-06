@@ -3,6 +3,8 @@ import { verifyAuth } from '@/lib/auth';
 import { Pengaturan, Admin } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { safeHexColor } from '@/lib/color';
+import { createBackup } from '@/lib/utils';
+import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 // GET - Ambil semua pengaturan
 export async function GET(request) {
@@ -54,6 +56,11 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
     }
 
+    // Ambil data sebelum untuk backup
+    const sebelum = {};
+    const allSettings = await Pengaturan.findAll();
+    allSettings.forEach(p => { sebelum[p.kunci] = p.nilai; });
+
     // Update setiap setting
     const updated = [];
     for (const [kunci, nilai] of Object.entries(settings)) {
@@ -67,6 +74,26 @@ export async function PUT(request) {
       }
       await Pengaturan.setNilai(kunci, normalizedValue ?? '');
       updated.push(kunci);
+    }
+
+    // Backup
+    const sesudah = {};
+    updated.forEach(k => { sesudah[k] = settings[k]; });
+    await createBackup('Update Pengaturan', 'pengaturan', sebelum, sesudah, auth.user.id);
+
+    // Kirim salinan email
+    try {
+      const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
+      await kirimEmailAksiAdmin({
+        aksi: 'Update Pengaturan',
+        deskripsi: `${updated.length} pengaturan diperbarui: ${updated.join(', ')}`,
+        detail: '',
+        adminNama: auth.user.nama_lengkap,
+        adminJabatan: auth.user.jabatan,
+        emailTujuan,
+      });
+    } catch (emailErr) {
+      console.error('Gagal kirim email salinan:', emailErr);
     }
 
     return NextResponse.json({

@@ -66,25 +66,47 @@ async function createPrimaryTransporter() {
 
   const host = process.env.GMAIL_SMTP_HOST || process.env.SMTP_HOST || dbCfg.smtp_host || 'smtp.gmail.com';
   const port = parseInt(process.env.GMAIL_SMTP_PORT || process.env.SMTP_PORT || dbCfg.smtp_port || '587');
-  const secure = (process.env.GMAIL_SMTP_SECURE || process.env.SMTP_SECURE || 'false') === 'true';
+  const secure = (process.env.GMAIL_SMTP_SECURE || process.env.SMTP_SECURE || (port === 465 ? 'true' : 'false')) === 'true';
   const user = process.env.GMAIL_EMAIL || process.env.SMTP_USER || '';
   const pass = process.env.GMAIL_PASSWORD || process.env.SMTP_PASS || '';
   const from = process.env.GMAIL_FROM || process.env.SMTP_FROM || user || 'noreply@tpq.local';
 
-  return { transporter: nodemailer.createTransport({ host, port, secure, auth: user ? { user, pass } : undefined }), from, hasAuth: Boolean(user) };
+  const transportConfig = {
+    host,
+    port,
+    secure,
+    auth: user ? { user, pass } : undefined,
+    // Wajibkan STARTTLS pada port 587 agar koneksi selalu terenkripsi
+    requireTLS: !secure && port === 587,
+    tls: {
+      // Verifikasi sertifikat server — jangan izinkan sertifikat palsu
+      rejectUnauthorized: process.env.NODE_ENV === 'production',
+      minVersion: 'TLSv1.2',
+    },
+  };
+
+  return { transporter: nodemailer.createTransport(transportConfig), from, hasAuth: Boolean(user) };
 }
 
-// Transporter cadangan (SMTP server 2)
+// Transporter cadangan (Hotmail / Outlook / SMTP server 2)
 function createBackupTransporter() {
   if (!(process.env.OUTLOOK_SMTP_HOST || process.env.SMTP2_HOST)) return null;
+  const host = process.env.OUTLOOK_SMTP_HOST || process.env.SMTP2_HOST;
+  const port = parseInt(process.env.OUTLOOK_SMTP_PORT || process.env.SMTP2_PORT || '587');
+  const secure = (process.env.OUTLOOK_SMTP_SECURE || process.env.SMTP2_SECURE || (port === 465 ? 'true' : 'false')) === 'true';
+  const user = process.env.OUTLOOK_EMAIL || process.env.SMTP2_USER;
+  const pass = process.env.OUTLOOK_PASSWORD || process.env.SMTP2_PASS;
+
   return nodemailer.createTransport({
-    host: process.env.OUTLOOK_SMTP_HOST || process.env.SMTP2_HOST,
-    port: parseInt(process.env.OUTLOOK_SMTP_PORT || process.env.SMTP2_PORT || '587'),
-    secure: (process.env.OUTLOOK_SMTP_SECURE || process.env.SMTP2_SECURE || 'false') === 'true',
-    auth: (process.env.OUTLOOK_EMAIL || process.env.SMTP2_USER) ? {
-      user: process.env.OUTLOOK_EMAIL || process.env.SMTP2_USER,
-      pass: process.env.OUTLOOK_PASSWORD || process.env.SMTP2_PASS,
-    } : undefined,
+    host,
+    port,
+    secure,
+    auth: user ? { user, pass } : undefined,
+    requireTLS: !secure && port === 587,
+    tls: {
+      rejectUnauthorized: process.env.NODE_ENV === 'production',
+      minVersion: 'TLSv1.2',
+    },
   });
 }
 

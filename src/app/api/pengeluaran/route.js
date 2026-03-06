@@ -118,6 +118,7 @@ export async function POST(request) {
     // Ambil saldo terakhir
     const lastJurnal = await JurnalKas.findOne({
       order: [['id', 'DESC']],
+      transaction: t,
     });
     const saldoBerjalan = (lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0) - parseFloat(nominal);
     

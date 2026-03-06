@@ -3,6 +3,7 @@ import { verifyAuth } from '@/lib/auth';
 import { Kegiatan, Admin } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
+import { createBackup } from '@/lib/utils';
 
 // GET - Ambil semua kegiatan
 export async function GET(request) {
@@ -56,7 +57,8 @@ export async function POST(request) {
       admin_id: auth.user.id,
     });
 
-    // Kirim email notifikasi
+    // Backup & notifikasi
+    await createBackup('Tambah Kegiatan', 'kegiatan', null, kegiatan.toJSON(), auth.user.id);
     try {
       const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
       await kirimEmailAksiAdmin({
