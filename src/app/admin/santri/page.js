@@ -53,6 +53,13 @@ export default function DaftarSantriPage() {
 
   useEffect(() => {
     fetchData();
+    // Baca pesan sukses dari URL
+    const params = new URLSearchParams(window.location.search);
+    const msg = params.get('success');
+    if (msg) {
+      setSuccess(decodeURIComponent(msg));
+      window.history.replaceState({}, '', '/admin/santri');
+    }
   }, [tahun]);
 
   useEffect(() => {
@@ -254,10 +261,10 @@ export default function DaftarSantriPage() {
           <div className="table-container">
             <table className="w-full min-w-[900px]">
               <thead>
-                <tr className="table-header">
-                  <th className="px-3 py-3 text-left sticky left-0 bg-green-50">No</th>
-                  <th className="px-3 py-3 text-left sticky left-10 bg-green-50">Nama</th>
-                  <th className="px-3 py-3 text-center">Jilid</th>
+                  <tr className="bg-green-50 text-xs text-green-800 font-semibold">
+                    <th className="px-3 py-3 text-center sticky left-0 bg-green-50 w-10">#</th>
+                    <th className="px-3 py-3 text-left sticky left-10 bg-green-50 min-w-[160px]">Nama Santri</th>
+                    <th className="px-3 py-3 text-center uppercase tracking-wide">Jilid</th>
                   {namaBulan.map((b, i) => (
                     <th key={i} className="px-2 py-3 text-center">{b}</th>
                   ))}
@@ -278,8 +285,11 @@ export default function DaftarSantriPage() {
                       className="table-row cursor-pointer hover:bg-green-50"
                       onClick={() => { setDetailSantri(santri); setShowDetailModal(true); }}
                     >
-                      <td className="table-cell sticky left-0 bg-white">{index + 1}</td>
-                      <td className="table-cell sticky left-10 bg-white">
+                    <td className="px-2 py-3 text-center text-xs text-gray-600 sticky left-0 bg-white w-10">
+                          <div className="font-semibold">{index + 1}</div>
+                          {santri.no_absen && <div className="text-gray-400 mt-0.5">#{santri.no_absen}</div>}
+                        </td>
+                        <td className="table-cell sticky left-10 bg-white min-w-[160px]">
                         <div>
                           <p className="font-medium" style={{ color: santri.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{santri.nama_lengkap}</p>
                           <p className="text-xs" style={{ color: santri.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>
@@ -344,6 +354,12 @@ export default function DaftarSantriPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm">
+              {detailSantri.no_absen && (
+                <div className="bg-green-50 rounded p-3 col-span-2 flex items-center gap-2">
+                  <span className="text-xs text-green-600 font-medium">No. Absen</span>
+                  <span className="font-bold text-green-800 text-lg">#{detailSantri.no_absen}</span>
+                </div>
+              )}
               <div className="bg-gray-50 rounded p-3">
                 <p className="text-xs text-gray-500">NIK</p>
                 <p className="font-medium">{detailSantri.nik}</p>

@@ -22,7 +22,7 @@ export async function GET(request) {
     // Ambil semua santri (aktif + nonaktif) untuk manajemen status
     const santriList = await Santri.findAll({
       order: [['nama_lengkap', 'ASC']],
-      attributes: ['id', 'nik', 'nama_lengkap', 'jilid', 'tgl_mendaftar', 'status_aktif', 'tgl_nonaktif', 'nama_wali', 'no_telp_wali', 'is_subsidi'],
+      attributes: ['id', 'no_absen', 'nik', 'nama_lengkap', 'jilid', 'tgl_mendaftar', 'status_aktif', 'tgl_nonaktif', 'nama_wali', 'no_telp_wali', 'is_subsidi'],
     });
 
     const nominalNonSubsidi = parseInt(await Pengaturan.getNilai('nominal_spp_non_subsidi', '40000'), 10) || 40000;
@@ -98,6 +98,7 @@ export async function GET(request) {
       
       return {
         id: santri.id,
+        no_absen: santri.no_absen,
         nik: santri.nik,
         nama_lengkap: santri.nama_lengkap,
         jilid: santri.jilid,
@@ -105,6 +106,8 @@ export async function GET(request) {
         is_subsidi: !!santri.is_subsidi,
         tgl_mendaftar: santri.tgl_mendaftar,
         tgl_nonaktif: santri.tgl_nonaktif,
+        nama_wali: santri.nama_wali,
+        no_telp_wali: santri.no_telp_wali,
         nominal_spp: nominalSpp,
         tahun: tahun,
         bulan_status: bulanStatus,

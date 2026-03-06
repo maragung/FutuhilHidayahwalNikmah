@@ -6,6 +6,7 @@ import { Op } from 'sequelize';
 import { createBackup } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
+const ROLE_BISA_KELOLA_SANTRI = ['Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
 // GET - Ambil semua santri (auth required)
 export async function GET(request) {
   try {
@@ -86,7 +87,7 @@ export async function POST(request) {
     }
     
     const body = await request.json();
-    const { nik, nama_lengkap, jilid, alamat, nama_wali, no_telp_wali, email_wali, tgl_mendaftar, pin, is_subsidi } = body;
+    const { nik, nama_lengkap, jilid, alamat, nama_wali, no_telp_wali, email_wali, tgl_mendaftar, pin, is_subsidi, no_absen } = body;
     
     // PIN verification
     const admin = await Admin.findByPk(auth.user.id);
@@ -94,6 +95,11 @@ export async function POST(request) {
     if (!pin) return NextResponse.json({ success: false, pesan: 'PIN wajib diisi' }, { status: 400 });
     const pinValid = await admin.validPin(pin);
     if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
+
+    // Cek role
+    if (!ROLE_BISA_KELOLA_SANTRI.includes(admin.jabatan)) {
+      return NextResponse.json({ success: false, pesan: 'Jabatan Anda tidak memiliki akses untuk menambah santri' }, { status: 403 });
+    }
     
     if (!nik || !nama_lengkap) {
       return NextResponse.json(
@@ -112,6 +118,7 @@ export async function POST(request) {
     }
     
     const santri = await Santri.create({
+      no_absen: no_absen ? parseInt(no_absen) : null,
       nik,
       nama_lengkap,
       jilid: jilid || 'Jilid 1',
@@ -137,6 +144,7 @@ export async function POST(request) {
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>NIK</strong></td><td style="padding:5px;border:1px solid #ddd;">${nik}</td></tr>
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Nama</strong></td><td style="padding:5px;border:1px solid #ddd;">${nama_lengkap}</td></tr>
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Jilid</strong></td><td style="padding:5px;border:1px solid #ddd;">${jilid || 'Jilid 1'}</td></tr>
+          ${no_absen ? `<tr><td style="padding:5px;border:1px solid #ddd;"><strong>No. Absen</strong></td><td style="padding:5px;border:1px solid #ddd;">${no_absen}</td></tr>` : ''}
         </table>`,
         adminNama: auth.user.nama_lengkap,
         adminJabatan: auth.user.jabatan,

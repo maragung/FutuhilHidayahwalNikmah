@@ -10,7 +10,7 @@ const ROLES_DEFAULT = [
   { id: 1, nama_role: 'Pimpinan TPQ', level: 1, is_system: true, deskripsi: 'Pimpinan / Kepala TPQ – akses penuh', akses_default: null },
   { id: 2, nama_role: 'Sekretaris',   level: 2, is_system: true, deskripsi: 'Sekretaris – kelola santri & laporan', akses_default: JSON.stringify(['dashboard','santri','tambah_santri','bayar','pembayaran_lain','laporan','jurnal','saran','export_database']) },
   { id: 3, nama_role: 'Bendahara',    level: 3, is_system: true, deskripsi: 'Bendahara – kelola keuangan',          akses_default: JSON.stringify(['dashboard','santri','bayar','pembayaran_lain','infak','pengeluaran','dana','jurnal','laporan','pengaturan','export_database']) },
-  { id: 4, nama_role: 'Pengajar',     level: 4, is_system: true, deskripsi: 'Pengajar / Ustadz – akses terbatas',  akses_default: JSON.stringify(['dashboard','santri','bayar','saran']) },
+  { id: 4, nama_role: 'Pengajar',     level: 4, is_system: true, deskripsi: 'Pengajar / Ustadz – akses terbatas',  akses_default: JSON.stringify(['dashboard','santri','tambah_santri','bayar','saran']) },
   { id: 5, nama_role: 'Lainnya',      level: 5, is_system: true, deskripsi: 'Role lainnya – akses terbatas',       akses_default: JSON.stringify(['dashboard']) },
 ];
 
@@ -25,6 +25,7 @@ async function migrate() {
     // Sync semua model (buat tabel)
     await sequelize.sync({ alter: true });
     console.log('✅ Semua tabel berhasil dibuat/diupdate!');
+    console.log('   • Kolom no_absen tersedia di tabel santri (nullable, integer)');
 
     // Seed roles default
     const roleCount = await Role.count();

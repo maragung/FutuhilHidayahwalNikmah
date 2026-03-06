@@ -6,6 +6,7 @@ import { createBackup } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 const ROLE_BISA_KELOLA_STATUS = ['Pimpinan TPQ', 'Sekretaris', 'Bendahara'];
+const ROLE_BISA_EDIT_SANTRI   = ['Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
 
 // GET - Ambil santri berdasarkan ID (auth required)
 export async function GET(request, { params }) {
@@ -86,6 +87,14 @@ export async function PUT(request, { params }) {
     const dataSebelum = santri.toJSON();
     const { pin, ...updateData } = body;
 
+    // Cek role untuk edit data umum
+    if (!ROLE_BISA_EDIT_SANTRI.includes(auth.user.jabatan)) {
+      return NextResponse.json(
+        { success: false, pesan: 'Jabatan Anda tidak memiliki akses untuk mengedit data santri' },
+        { status: 403 }
+      );
+    }
+
     if (updateData.status_aktif !== undefined) {
       if (!ROLE_BISA_KELOLA_STATUS.includes(auth.user.jabatan)) {
         return NextResponse.json(
@@ -99,6 +108,11 @@ export async function PUT(request, { params }) {
       } else {
         updateData.tgl_nonaktif = null;
       }
+    }
+
+    // Normalisasi no_absen
+    if ('no_absen' in updateData) {
+      updateData.no_absen = updateData.no_absen ? parseInt(updateData.no_absen) : null;
     }
 
     await santri.update(updateData);

@@ -7,6 +7,11 @@ const Santri = sequelize.define('Santri', {
     primaryKey: true,
     autoIncrement: true,
   },
+  no_absen: {
+    type: DataTypes.INTEGER.UNSIGNED,
+    allowNull: true,
+    comment: 'Nomor absen santri',
+  },
   nik: {
     type: DataTypes.STRING(16),
     allowNull: false,
