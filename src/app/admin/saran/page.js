@@ -77,16 +77,16 @@ export default function SaranPage() {
 
   const handleSubmitTanggapan = async (pin) => {
     if (!selectedSaran || !tanggapan.trim()) return;
-    
+
     setSubmitLoading(true);
     const token = localStorage.getItem('auth_token');
-    
+
     try {
       const res = await fetch(`/api/saran/${selectedSaran.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           tanggapan: tanggapan.trim(),
@@ -94,7 +94,7 @@ export default function SaranPage() {
           pin,
         }),
       });
-      
+
       const data = await res.json();
       if (data.success) {
         setSelectedSaran(null);
@@ -107,9 +107,12 @@ export default function SaranPage() {
       alert('Gagal menyimpan tanggapan');
     } finally {
       setSubmitLoading(false);
-    }, pin) => {
+    }
+  };
+
+  const handleDelete = async (id, pin) => {
     const token = localStorage.getItem('auth_token');
-    
+
     try {
       const res = await fetch(`/api/saran/${id}`, {
         method: 'DELETE',
@@ -118,11 +121,8 @@ export default function SaranPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ pin }),
-      const res = await fetch(`/api/saran/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       const data = await res.json();
       if (data.success) {
         fetchSaran();
