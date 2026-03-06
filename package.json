@@ -13,7 +13,7 @@
     "db:check": "node src/lib/db-check.js"
   },
   "engines": {
-    "node": ">=20.0.0 <23.0.0"
+    "node": ">=20.0.0 =<24.0.0"
   },
   "dependencies": {
     "@faker-js/faker": "^8.4.1",
