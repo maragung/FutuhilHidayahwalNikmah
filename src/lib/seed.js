@@ -78,7 +78,7 @@ async function seed() {
     console.log('   Username : developer');
     console.log('   Email    : gmaragung@gmail.com');
     console.log('   Password : admin123456789');
-    console.log('   PIN      : 123456');
+    console.log('   PIN      : 123456  (per-akun — ubah via halaman Akun setelah login)');
 
     process.exit(0);
   } catch (error) {

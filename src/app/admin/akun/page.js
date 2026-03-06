@@ -29,6 +29,14 @@ export default function AkunPage() {
   const [pwdSuccess, setPwdSuccess] = useState('');
   const [pwdLoading, setPwdLoading] = useState(false);
 
+  // PIN change state
+  const [showChangePin, setShowChangePin] = useState(false);
+  const [pinSetup, setPinSetup] = useState({ password: '', newPin: '', confirmPin: '' });
+  const [pinError, setPinError] = useState('');
+  const [pinSuccess, setPinSuccess] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
+  const [hasPin, setHasPin] = useState(null);
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -61,6 +69,46 @@ export default function AkunPage() {
   }, []);
 
   useEffect(() => { fetchUser(); }, [fetchUser]);
+
+  const fetchHasPin = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch('/api/admin/pin', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) setHasPin(data.has_pin);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { fetchHasPin(); }, [fetchHasPin]);
+
+  const handleSetPin = async () => {
+    if (!pinSetup.password) { setPinError('Password akun wajib diisi'); return; }
+    if (!pinSetup.newPin) { setPinError('PIN baru wajib diisi'); return; }
+    if (!/^\d{6}$/.test(pinSetup.newPin)) { setPinError('PIN harus tepat 6 digit angka'); return; }
+    if (pinSetup.newPin !== pinSetup.confirmPin) { setPinError('Konfirmasi PIN tidak cocok'); return; }
+
+    setPinError(''); setPinSuccess('');
+    setPinLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch('/api/admin/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ password: pinSetup.password, new_pin: pinSetup.newPin }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPinSuccess('PIN berhasil diperbarui!');
+        setShowChangePin(false);
+        setPinSetup({ password: '', newPin: '', confirmPin: '' });
+        setHasPin(true);
+      } else {
+        setPinError(data.pesan || 'Gagal memperbarui PIN');
+      }
+    } catch { setPinError('Terjadi kesalahan'); }
+    finally { setPinLoading(false); }
+  };
 
   // === QR / DEEP LINK ===
   const handleLoginApp = async () => {
@@ -289,6 +337,90 @@ export default function AkunPage() {
               <p><span className="font-medium">Terima email perubahan:</span> {user?.terima_email_perubahan ? 'Aktif' : 'Nonaktif'}</p>
             </div>
           )}
+
+          <hr />
+
+          {/* Ubah PIN */}
+          <div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => { setShowChangePin(!showChangePin); setPinError(''); setPinSuccess(''); }}
+                className="text-sm text-purple-600 hover:underline font-medium"
+              >
+                {showChangePin ? '✕ Tutup' : '🔑 Ubah PIN'}
+              </button>
+              {hasPin === false && (
+                <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">PIN belum diatur</span>
+              )}
+              {hasPin === true && (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">PIN aktif</span>
+              )}
+            </div>
+
+            {showChangePin && (
+              <div className="mt-3 space-y-3">
+                {pinSuccess && <div className="p-2 bg-green-50 rounded border border-green-200 text-green-700 text-sm">{pinSuccess}</div>}
+                {pinError && <div className="p-2 bg-red-50 rounded border border-red-200 text-red-700 text-sm">{pinError}</div>}
+                {!pinSuccess && (
+                  <>
+                    <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                      <p className="text-xs text-purple-700">
+                        PIN digunakan untuk verifikasi setiap transaksi (pembayaran, pengeluaran, infak, dll).
+                        {hasPin ? ' Masukkan password untuk mengubah PIN.' : ' Atur PIN Anda sekarang.'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Password Akun</label>
+                      <input
+                        type="password"
+                        value={pinSetup.password}
+                        onChange={(e) => setPinSetup({ ...pinSetup, password: e.target.value })}
+                        placeholder="Masukkan password akun Anda"
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">PIN Baru <span className="text-red-500">*</span> (6 digit)</label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        value={pinSetup.newPin}
+                        onChange={(e) => setPinSetup({ ...pinSetup, newPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                        placeholder="6 digit angka"
+                        className="input-field tracking-widest text-center text-lg"
+                        maxLength={6}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">{pinSetup.newPin.length}/6 digit</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Konfirmasi PIN Baru</label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        value={pinSetup.confirmPin}
+                        onChange={(e) => setPinSetup({ ...pinSetup, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                        placeholder="Ulangi PIN baru"
+                        className="input-field tracking-widest text-center text-lg"
+                        maxLength={6}
+                      />
+                      {pinSetup.newPin && pinSetup.confirmPin && (
+                        <p className={`text-xs mt-1 ${pinSetup.newPin === pinSetup.confirmPin ? 'text-green-600' : 'text-red-500'}`}>
+                          {pinSetup.newPin === pinSetup.confirmPin ? '✓ PIN cocok' : '✗ PIN tidak cocok'}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleSetPin}
+                      disabled={pinLoading || pinSetup.newPin.length < 6}
+                      className="btn btn-primary w-full"
+                    >
+                      {pinLoading ? 'Menyimpan...' : (hasPin ? 'Perbarui PIN' : 'Atur PIN')}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           <hr />
 

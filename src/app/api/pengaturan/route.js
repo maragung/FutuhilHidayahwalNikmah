@@ -17,9 +17,11 @@ export async function GET(request) {
 
     // Convert ke object key-value
     const data = {};
-    pengaturan.forEach(p => { data[p.kunci] = p.nilai; });
+    pengaturan.forEach(p => {
+      data[p.kunci] = p.nilai;
+    });
 
-    return NextResponse.json({ success: true, data, raw: pengaturan });
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error('Get pengaturan error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
@@ -56,12 +58,14 @@ export async function PUT(request) {
     const updated = [];
     for (const [kunci, nilai] of Object.entries(settings)) {
       let normalizedValue = nilai;
+      // Kredensial SMTP (user/pass/from/secure) tidak disimpan via UI - hanya dari env/Vercel
+      if (['smtp_user', 'smtp_pass', 'smtp_from', 'smtp_secure'].includes(kunci)) continue;
       if (kunci === 'warna_non_subsidi') {
         normalizedValue = safeHexColor(nilai, '#04B816');
       } else if (kunci === 'warna_subsidi') {
         normalizedValue = safeHexColor(nilai, '#045EB8');
       }
-      await Pengaturan.setNilai(kunci, normalizedValue);
+      await Pengaturan.setNilai(kunci, normalizedValue ?? '');
       updated.push(kunci);
     }
 

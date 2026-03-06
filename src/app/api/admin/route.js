@@ -76,9 +76,9 @@ export async function POST(request) {
       if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
     }
     
-    if (!nama_lengkap || !jabatan || !email || !password) {
+    if (!nama_lengkap || !jabatan || !email || !password || !username) {
       return NextResponse.json(
-        { success: false, pesan: 'Semua field harus diisi' },
+        { success: false, pesan: 'Nama lengkap, jabatan, username, email, dan password wajib diisi' },
         { status: 400 }
       );
     }
@@ -114,7 +114,7 @@ export async function POST(request) {
       username: normalizedUsername,
       email,
       password,
-      pin: adminPin || null,
+      pin: adminPin || '123456', // PIN default 123456, admin perlu ubah sendiri via halaman Akun
       akses: akses || null,
       is_active: true,
     });
@@ -144,7 +144,7 @@ export async function POST(request) {
     
     return NextResponse.json({
       success: true,
-      pesan: 'Admin berhasil ditambahkan',
+      pesan: 'Admin berhasil ditambahkan. PIN default: 123456 — minta admin untuk mengubahnya via halaman Akun.',
       data: {
         id: admin.id,
         username: admin.username,

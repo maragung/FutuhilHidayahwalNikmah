@@ -51,7 +51,7 @@ async function migrate() {
       console.log('✅ Admin default berhasil dibuat!');
       console.log('   Email: maragung@outlook.com');
       console.log('   Password: admin123456789');
-      console.log('   PIN: 123456');
+      console.log('   PIN: 123456  (per-akun — ubah via halaman Akun setelah login)');
     } else {
       const pimpinan = await Admin.findOne({ where: { jabatan: 'Pimpinan TPQ' } });
       if (pimpinan && !pimpinan.username) {
@@ -92,12 +92,25 @@ async function migrate() {
     // Buat pengaturan default
     const settingsCount = await Pengaturan.count();
 
-    // Pastikan semua admin punya terima_email_perubahan = true (default baru)
-    await Admin.update(
+    // Set terima_email_perubahan = true hanya untuk admin yang belum punya nilai (NULL)
+    const [affectedRows] = await Admin.update(
       { terima_email_perubahan: true },
-      { where: { terima_email_perubahan: false } }
+      { where: { terima_email_perubahan: null } }
     );
-    console.log('✅ Semua admin diset terima_email_perubahan = true');
+    if (affectedRows > 0) {
+      console.log(`✅ ${affectedRows} admin di-set terima_email_perubahan = true (default)`);
+    }
+
+    // Pastikan setiap admin punya PIN (PIN per-akun, default 123456)
+    const adminsMissingPin = await Admin.findAll({ where: { pin: null } });
+    if (adminsMissingPin.length > 0) {
+      for (const admin of adminsMissingPin) {
+        admin.pin = '123456';
+        await admin.save();
+        console.log(`✅ PIN default (123456) diset untuk akun: ${admin.username || admin.email}`);
+      }
+      console.log(`   ⚠️  ${adminsMissingPin.length} akun mendapat PIN default 123456 — harap ubah via halaman Akun`);
+    }
 
     if (settingsCount === 0) {
       await Pengaturan.bulkCreate([
@@ -109,8 +122,20 @@ async function migrate() {
         { kunci: 'tahun_mulai_pembukuan', nilai: String(new Date().getFullYear()), keterangan: 'Tahun mulai pembukuan' },
         { kunci: 'alamat_tpq', nilai: '', keterangan: 'Alamat TPQ' },
         { kunci: 'no_telp_tpq', nilai: '', keterangan: 'Nomor telepon TPQ' },
+        { kunci: 'smtp_host', nilai: '', keterangan: 'SMTP Host (opsional, override env var GMAIL_SMTP_HOST)' },
+        { kunci: 'smtp_port', nilai: '', keterangan: 'SMTP Port (opsional, override env var GMAIL_SMTP_PORT)' },
       ]);
       console.log('✅ Pengaturan default berhasil dibuat!');
+    } else {
+      // Pastikan setting SMTP host/port tersedia untuk instalasi lama (kredensial dari env saja)
+      const smtpKeys = ['smtp_host', 'smtp_port'];
+      for (const kunci of smtpKeys) {
+        const exists = await Pengaturan.findOne({ where: { kunci } });
+        if (!exists) {
+          await Pengaturan.create({ kunci, nilai: '', keterangan: `SMTP override: ${kunci}` });
+        }
+      }
+      console.log('✅ Setting SMTP dipastikan tersedia');
     }
     
     console.log('');
