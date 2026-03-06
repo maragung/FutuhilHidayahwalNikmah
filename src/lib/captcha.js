@@ -1,6 +1,16 @@
 import jwt from 'jsonwebtoken';
 
 const CAPTCHA_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const DEV_FALLBACK_JWT_SECRET = 'dev-only-jwt-secret-tpq-futuhil-hidayah';
+
+function getCaptchaSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET harus diatur pada environment production');
+  }
+  return DEV_FALLBACK_JWT_SECRET;
+}
 
 export function generateCaptchaCode(length = 6) {
   let code = '';
@@ -13,7 +23,7 @@ export function generateCaptchaCode(length = 6) {
 export function createCaptchaToken(code) {
   return jwt.sign(
     { type: 'captcha', code: String(code || '').toUpperCase() },
-    process.env.JWT_SECRET || 'fallback-secret',
+    getCaptchaSecret(),
     { expiresIn: '5m' }
   );
 }
@@ -24,7 +34,7 @@ export function verifyCaptchaPayload(token, answer) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    const decoded = jwt.verify(token, getCaptchaSecret());
     if (decoded?.type !== 'captcha') {
       return { valid: false, message: 'Captcha tidak valid' };
     }

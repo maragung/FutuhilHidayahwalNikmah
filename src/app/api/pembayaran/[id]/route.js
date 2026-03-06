@@ -38,7 +38,7 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
-  const t = await sequelize.transaction();
+  let t;
   try {
     await sequelize.authenticate();
     const auth = await verifyAuth(request);
@@ -47,6 +47,8 @@ export async function PUT(request, { params }) {
     const body = await request.json();
     const pinCheck = await verifyPin(auth.user.id, body.pin);
     if (!pinCheck.ok) return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
+
+    t = await sequelize.transaction();
 
     const { id } = await params;
     const pembayaran = await PembayaranSPP.findByPk(id, { transaction: t });
@@ -109,14 +111,20 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json({ success: true, pesan: 'Pembayaran berhasil diperbarui', data: pembayaran });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      return NextResponse.json(
+        { success: false, pesan: 'Periode SPP ini sudah ada untuk santri tersebut' },
+        { status: 400 }
+      );
+    }
     console.error('Update pembayaran error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }
 }
 
 export async function DELETE(request, { params }) {
-  const t = await sequelize.transaction();
+  let t;
   try {
     await sequelize.authenticate();
     const auth = await verifyAuth(request);
@@ -125,6 +133,8 @@ export async function DELETE(request, { params }) {
     const body = await request.json();
     const pinCheck = await verifyPin(auth.user.id, body.pin);
     if (!pinCheck.ok) return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
+
+    t = await sequelize.transaction();
 
     const { id } = await params;
     const pembayaran = await PembayaranSPP.findByPk(id, { transaction: t });
@@ -168,7 +178,7 @@ export async function DELETE(request, { params }) {
 
     return NextResponse.json({ success: true, pesan: 'Pembayaran berhasil dihapus' });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Delete pembayaran error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }

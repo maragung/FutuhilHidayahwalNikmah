@@ -68,7 +68,7 @@ export async function GET(request) {
 
 // POST - Tambah infak/sedekah
 export async function POST(request) {
-  const t = await sequelize.transaction();
+  let t;
   
   try {
     await sequelize.authenticate();
@@ -98,6 +98,8 @@ export async function POST(request) {
       );
     }
     
+    t = await sequelize.transaction();
+
     const kodeTransaksi = generateKodeInvoice('INF');
     
     const infak = await InfakSedekah.create({
@@ -158,7 +160,7 @@ export async function POST(request) {
       data: infak,
     }, { status: 201 });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Create infak error:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },

@@ -73,7 +73,7 @@ export async function GET(request) {
 
 // POST - Tambah pengeluaran
 export async function POST(request) {
-  const t = await sequelize.transaction();
+  let t;
   
   try {
     await sequelize.authenticate();
@@ -103,6 +103,8 @@ export async function POST(request) {
       );
     }
     
+    t = await sequelize.transaction();
+
     const kodePengeluaran = generateKodeInvoice('OUT');
     
     const pengeluaran = await Pengeluaran.create({
@@ -164,7 +166,7 @@ export async function POST(request) {
       data: pengeluaran,
     }, { status: 201 });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Create pengeluaran error:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },

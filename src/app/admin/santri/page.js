@@ -412,7 +412,7 @@ export default function DaftarSantriPage() {
             <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
               <Link
                 href={`/admin/bayar?santri=${detailSantri.id}`}
-                className="btn btn-primary flex-1 text-center"
+                className="btn-primary flex-1 text-center"
                 onClick={() => setShowDetailModal(false)}
               >
                 💳 Bayar SPP
@@ -424,13 +424,13 @@ export default function DaftarSantriPage() {
                   setShowDetailModal(false);
                   setShowDeleteModal(true);
                 }}
-                className={`btn flex-1 ${detailSantri.status_aktif ? 'btn-danger' : 'btn-primary'}`}
+                className={`flex-1 ${detailSantri.status_aktif ? 'btn-danger' : 'btn-primary'}`}
               >
                 {detailSantri.status_aktif ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
               </button>
               <Link
                 href={`/admin/santri/tambah?edit=${detailSantri.id}`}
-                className="btn btn-secondary flex-1 text-center"
+                className="btn-secondary flex-1 text-center"
                 onClick={() => setShowDetailModal(false)}
               >
                 ✏️ Edit Data

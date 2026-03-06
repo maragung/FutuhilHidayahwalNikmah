@@ -69,7 +69,7 @@ export async function GET(request) {
 
 // POST - Tambah pembayaran baru (multi bulan)
 export async function POST(request) {
-  const t = await sequelize.transaction();
+  let t;
   
   try {
     await sequelize.authenticate();
@@ -252,6 +252,8 @@ export async function POST(request) {
       nominalPerBulan = manualNominal;
     }
 
+    t = await sequelize.transaction();
+
     const pembayaranList = [];
     
     // Ambil saldo terakhir
@@ -327,7 +329,13 @@ export async function POST(request) {
       nominal_per_bulan: nominalPerBulan,
     }, { status: 201 });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      return NextResponse.json(
+        { success: false, pesan: 'Pembayaran untuk bulan tersebut sudah tercatat' },
+        { status: 400 }
+      );
+    }
     console.error('Create pembayaran error:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },

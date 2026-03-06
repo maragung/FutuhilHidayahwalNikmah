@@ -60,6 +60,21 @@ const PembayaranSPP = sequelize.define('PembayaranSPP', {
   },
 }, {
   tableName: 'pembayaran_spp',
+  indexes: [
+    {
+      unique: true,
+      name: 'uniq_spp_santri_periode',
+      fields: ['santri_id', 'tahun_spp', 'bulan_spp'],
+    },
+    {
+      name: 'idx_spp_tahun_bulan',
+      fields: ['tahun_spp', 'bulan_spp'],
+    },
+    {
+      name: 'idx_spp_santri_tanggal',
+      fields: ['santri_id', 'tgl_bayar'],
+    },
+  ],
 });
 
 module.exports = PembayaranSPP;

@@ -15,7 +15,7 @@ async function verifyPin(adminId, pin) {
 }
 
 export async function PUT(request, { params }) {
-  const t = await sequelize.transaction();
+  let t;
   try {
     await sequelize.authenticate();
     const auth = await verifyAuth(request);
@@ -24,6 +24,8 @@ export async function PUT(request, { params }) {
     const body = await request.json();
     const pinCheck = await verifyPin(auth.user.id, body.pin);
     if (!pinCheck.ok) return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
+
+    t = await sequelize.transaction();
 
     const { id } = await params;
     const pengeluaran = await Pengeluaran.findByPk(id, { transaction: t });
@@ -77,14 +79,14 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json({ success: true, pesan: 'Pengeluaran berhasil diperbarui', data: pengeluaran });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Update pengeluaran error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }
 }
 
 export async function DELETE(request, { params }) {
-  const t = await sequelize.transaction();
+  let t;
   try {
     await sequelize.authenticate();
     const auth = await verifyAuth(request);
@@ -93,6 +95,8 @@ export async function DELETE(request, { params }) {
     const body = await request.json();
     const pinCheck = await verifyPin(auth.user.id, body.pin);
     if (!pinCheck.ok) return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
+
+    t = await sequelize.transaction();
 
     const { id } = await params;
     const pengeluaran = await Pengeluaran.findByPk(id, { transaction: t });
@@ -136,7 +140,7 @@ export async function DELETE(request, { params }) {
 
     return NextResponse.json({ success: true, pesan: 'Pengeluaran berhasil dihapus' });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Delete pengeluaran error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }

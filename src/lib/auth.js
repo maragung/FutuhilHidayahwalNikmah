@@ -1,16 +1,26 @@
 import jwt from 'jsonwebtoken';
-import { cookies } from 'next/headers';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-tpq-futuhil-hidayah-2024';
+const DEV_FALLBACK_JWT_SECRET = 'dev-only-jwt-secret-tpq-futuhil-hidayah';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
+function resolveJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (secret) return secret;
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET harus diatur pada environment production');
+  }
+
+  return DEV_FALLBACK_JWT_SECRET;
+}
+
 export function generateToken(payload, expiresIn = JWT_EXPIRES_IN) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn });
+  return jwt.sign(payload, resolveJwtSecret(), { expiresIn });
 }
 
 export function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, resolveJwtSecret());
   } catch (error) {
     return null;
   }
@@ -22,18 +32,25 @@ export function getTokenFromRequest(request) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
-  
-  // Cek dari cookies
+
+  // Cek dari cookies (NextRequest)
+  if (request.cookies?.get) {
+    return request.cookies.get('auth_token')?.value || null;
+  }
+
+  // Fallback parser cookie mentah
   const cookieHeader = request.headers.get('cookie');
   if (cookieHeader) {
-    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-      const [key, value] = cookie.trim().split('=');
-      acc[key] = value;
-      return acc;
-    }, {});
-    return cookies['auth_token'];
+    const tokenPair = cookieHeader
+      .split(';')
+      .map((cookie) => cookie.trim())
+      .find((cookie) => cookie.startsWith('auth_token='));
+
+    if (tokenPair) {
+      return decodeURIComponent(tokenPair.substring('auth_token='.length));
+    }
   }
-  
+
   return null;
 }
 

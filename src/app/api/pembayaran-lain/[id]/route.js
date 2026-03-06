@@ -36,7 +36,7 @@ export async function GET(request, { params }) {
 
 // DELETE - Hapus pembayaran lain (soft)
 export async function DELETE(request, { params }) {
-  const t = await sequelize.transaction();
+  let t;
   try {
     const auth = await verifyAuth(request);
     if (!auth.success) {
@@ -51,6 +51,8 @@ export async function DELETE(request, { params }) {
     if (!body.pin) return NextResponse.json({ success: false, pesan: 'PIN wajib diisi' }, { status: 400 });
     const pinValid = await admin.validPin(body.pin);
     if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
+
+    t = await sequelize.transaction();
 
     const { id } = await params;
     const pembayaran = await PembayaranLain.findByPk(id, {
@@ -98,7 +100,7 @@ export async function DELETE(request, { params }) {
 
     return NextResponse.json({ success: true, pesan: 'Pembayaran berhasil dihapus' });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Delete pembayaran lain error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }
@@ -106,31 +108,29 @@ export async function DELETE(request, { params }) {
 
 // PUT - Update pembayaran lain
 export async function PUT(request, { params }) {
-  const t = await sequelize.transaction();
+  let t;
   try {
     const auth = await verifyAuth(request);
     if (!auth.success) {
-      await t.rollback();
       return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
     }
     await sequelize.authenticate();
 
     const admin = await Admin.findByPk(auth.user.id);
     if (!admin) {
-      await t.rollback();
       return NextResponse.json({ success: false, pesan: 'Admin tidak ditemukan' }, { status: 404 });
     }
 
     const body = await request.json();
     if (!body.pin) {
-      await t.rollback();
       return NextResponse.json({ success: false, pesan: 'PIN wajib diisi' }, { status: 400 });
     }
     const pinValid = await admin.validPin(body.pin);
     if (!pinValid) {
-      await t.rollback();
       return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
     }
+
+    t = await sequelize.transaction();
 
     const { id: pembayaranId } = await params;
     const pembayaran = await PembayaranLain.findByPk(pembayaranId, {
@@ -186,7 +186,7 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json({ success: true, pesan: 'Pembayaran berhasil diperbarui', data: pembayaran });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Update pembayaran lain error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }

@@ -59,7 +59,7 @@ export async function GET(request) {
 
 // POST - Tambah pembayaran lain
 export async function POST(request) {
-  const t = await sequelize.transaction();
+  let t;
   try {
     const auth = await verifyAuth(request);
     if (!auth.success) {
@@ -87,6 +87,8 @@ export async function POST(request) {
 
     const kegiatan = await Kegiatan.findByPk(kegiatan_id);
     if (!kegiatan) return NextResponse.json({ success: false, pesan: 'Kegiatan tidak ditemukan' }, { status: 404 });
+
+    t = await sequelize.transaction();
 
     const nominalFinal = nominal || parseFloat(kegiatan.nominal);
     const kodeInvoice = generateKodeInvoice('PBL');
@@ -144,7 +146,7 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, pesan: 'Pembayaran berhasil dicatat', data: pembayaran }, { status: 201 });
   } catch (error) {
-    await t.rollback();
+    if (t) await t.rollback();
     console.error('Create pembayaran lain error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }

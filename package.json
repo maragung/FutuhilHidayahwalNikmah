@@ -7,10 +7,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:migrate": "node src/lib/migrate.js",
+    "db:seed": "node src/lib/seed.js",
+    "db:check": "node src/lib/db-check.js"
   },
   "engines": {
-    "node": ">=24.0.0 <25.0.0"
+    "node": ">=20.0.0 <23.0.0"
   },
   "dependencies": {
     "@faker-js/faker": "^8.4.1",
