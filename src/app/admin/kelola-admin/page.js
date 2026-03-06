@@ -109,6 +109,7 @@ export default function ManageAdminPage() {
     nama_lengkap: '',
     jabatan: 'Pengajar',
     email: '',
+    username: '',
     password: '',
   });
   const [pinForm, setPinForm] = useState('');
@@ -179,8 +180,16 @@ export default function ManageAdminPage() {
     e.preventDefault();
     setError('');
 
-    if (!formData.nama_lengkap || !formData.email || !formData.password) {
+    if (!formData.nama_lengkap || !formData.email || !formData.username || !formData.password) {
       setError('Semua field wajib diisi');
+      return;
+    }
+    if (formData.username.length < 3) {
+      setError('Username minimal 3 karakter');
+      return;
+    }
+    if (!/^[a-zA-Z0-9._-]+$/.test(formData.username)) {
+      setError('Username hanya boleh huruf, angka, titik, strip, atau underscore');
       return;
     }
 
@@ -219,7 +228,7 @@ export default function ManageAdminPage() {
         setShowForm(false);
         setShowPinModal(false);
         setPinForm('');
-        setFormData({ nama_lengkap: '', jabatan: 'Pengajar', email: '', password: '' });
+        setFormData({ nama_lengkap: '', jabatan: 'Pengajar', email: '', username: '', password: '' });
         fetchAdmins();
       } else {
         setError(data.pesan);
@@ -431,6 +440,23 @@ export default function ManageAdminPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Username <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })}
+                  placeholder="Minimal 3 karakter (huruf, angka, . _ -)"
+                  className="input-field"
+                  minLength={3}
+                  maxLength={50}
+                  required
+                />
+                <p className="text-xs text-gray-400 mt-1">Digunakan untuk login selain email</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Password <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -523,6 +549,12 @@ export default function ManageAdminPage() {
                   </div>
                 </div>
                 <div className="space-y-1 text-sm">
+                  {admin.username && (
+                    <p className="text-gray-600">
+                      <span className="font-medium">Username:</span>{' '}
+                      <span className="font-mono bg-gray-100 px-1 rounded text-xs">{admin.username}</span>
+                    </p>
+                  )}
                   <p className="text-gray-600">
                     <span className="font-medium">Email:</span> {admin.email}
                   </p>
