@@ -1,5 +1,16 @@
 import nodemailer from 'nodemailer';
 
+/** Escape HTML entities to prevent XSS in email templates */
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatWibDdMmYyHm(date = new Date()) {
   const formatter = new Intl.DateTimeFormat('id-ID', {
     timeZone: 'Asia/Jakarta',
@@ -181,13 +192,13 @@ async function kirimEmailSaranBaru(saran, emailAdmins) {
         </div>
         <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none;">
           <table style="width: 100%; border-collapse: collapse;">
-            <tr><td style="padding: 8px 0; font-weight: bold;">Kategori:</td><td>${saran.kategori}</td></tr>
-            <tr><td style="padding: 8px 0; font-weight: bold;">Pengirim:</td><td>${saran.nama_pengirim}</td></tr>
-            ${saran.email_pengirim ? `<tr><td style="padding: 8px 0; font-weight: bold;">Email:</td><td>${saran.email_pengirim}</td></tr>` : ''}
+            <tr><td style="padding: 8px 0; font-weight: bold;">Kategori:</td><td>${escHtml(saran.kategori)}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Pengirim:</td><td>${escHtml(saran.nama_pengirim)}</td></tr>
+            ${saran.email_pengirim ? `<tr><td style="padding: 8px 0; font-weight: bold;">Email:</td><td>${escHtml(saran.email_pengirim)}</td></tr>` : ''}
           </table>
           <div style="margin-top: 15px; padding: 12px; background: white; border-left: 4px solid #10b981; border-radius: 4px;">
             <p style="margin: 0 0 5px 0; font-weight: bold;">Isi Saran:</p>
-            <p style="margin: 0; line-height: 1.6;">${saran.isi_saran}</p>
+            <p style="margin: 0; line-height: 1.6;">${escHtml(saran.isi_saran)}</p>
           </div>
         </div>
         <div style="background: #f3f4f6; padding: 12px; text-align: center; border-radius: 0 0 10px 10px;">
@@ -222,12 +233,12 @@ async function kirimEmailAksiAdmin({ aksi, deskripsi, detail, adminNama, adminJa
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: ${bg}; color: white; padding: 20px; border-radius: 10px 10px 0 0;">
-          <h2 style="margin: 0;">📋 ${aksi}</h2>
+          <h2 style="margin: 0;">📋 ${escHtml(aksi)}</h2>
           <p style="margin: 5px 0 0 0; opacity: 0.9;">TPQ Futuhil Hidayah Wal Hikmah</p>
         </div>
         <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none;">
-          <p style="margin: 0 0 5px; font-size: 13px; color: #6b7280;">Dilakukan oleh: <strong>${adminNama}</strong> (${adminJabatan}) - ${waktu}</p>
-          <p style="margin: 10px 0; font-weight: bold;">${deskripsi}</p>
+          <p style="margin: 0 0 5px; font-size: 13px; color: #6b7280;">Dilakukan oleh: <strong>${escHtml(adminNama)}</strong> (${escHtml(adminJabatan)}) - ${waktu}</p>
+          <p style="margin: 10px 0; font-weight: bold;">${escHtml(deskripsi)}</p>
           ${detail || ''}
         </div>
         <div style="background: #f3f4f6; padding: 12px; text-align: center; border-radius: 0 0 10px 10px;">

@@ -38,7 +38,7 @@ export async function GET(request) {
           : filterKategori === 'jilid' && filterJilid ? ` (Jilid ${filterJilid})`
           : filterKategori === 'lunas' ? ' (Lunas)'
           : '';
-        title = `Daftar Santri TPQ Futuhil Hidayah${kategoriLabel}`;
+        title = `Data Santri TPQ Futuhil Hidayah${kategoriLabel}`;
 
         const santriWhere = { status_aktif: true };
         if (filterKategori === 'subsidi') santriWhere.is_subsidi = true;

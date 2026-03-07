@@ -164,7 +164,7 @@ export default function DaftarSantriPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Daftar Santri</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Data Santri</h1>
           <p className="text-gray-500">Status pembayaran SPP santri</p>
         </div>
         <Link href="/admin/santri/tambah" className="btn-primary inline-flex items-center gap-2">

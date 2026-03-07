@@ -124,7 +124,7 @@ export default function ManageAdminPage() {
   
   const menuAkses = [
     { key: 'dashboard', label: 'Dashboard' },
-    { key: 'santri', label: 'Daftar Santri' },
+    { key: 'santri', label: 'Data Santri' },
     { key: 'tambah_santri', label: 'Pendaftaran Santri' },
     { key: 'bayar', label: 'Bayar SPP' },
     { key: 'pembayaran_lain', label: 'Pembayaran Lain' },

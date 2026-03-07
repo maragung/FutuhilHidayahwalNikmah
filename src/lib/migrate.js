@@ -41,10 +41,10 @@ async function migrate() {
     if (adminCount === 0) {
       // Buat admin default
       await Admin.create({
-        nama_lengkap: 'Pimpinan TPQ',
+        nama_lengkap: 'Developer',
         jabatan: 'Pimpinan TPQ',
         role_id: 1,
-        username: 'pimpinan',
+        username: 'developer',
         email: 'maragung@outlook.com',
         password: 'admin123456789',
         pin: '123456',

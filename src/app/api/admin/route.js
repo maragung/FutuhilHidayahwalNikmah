@@ -143,7 +143,7 @@ export async function POST(request) {
     
     return NextResponse.json({
       success: true,
-      pesan: 'Admin berhasil ditambahkan. PIN default: 123456 — minta admin untuk mengubahnya via halaman Akun.',
+      pesan: 'Admin berhasil ditambahkan. Minta admin mengatur PIN via halaman Akun.',
       data: {
         id: admin.id,
         username: admin.username,

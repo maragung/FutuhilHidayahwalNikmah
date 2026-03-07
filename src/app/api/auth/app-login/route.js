@@ -27,8 +27,8 @@ export async function POST(request) {
     });
     if (!admin) {
       return NextResponse.json(
-        { success: false, pesan: 'Akun tidak ditemukan atau nonaktif' },
-        { status: 404 }
+        { success: false, pesan: 'Username atau password salah' },
+        { status: 401 }
       );
     }
 
@@ -36,7 +36,7 @@ export async function POST(request) {
     if (!passwordValid) {
       return NextResponse.json(
         { success: false, pesan: 'Username atau password salah' },
-        { status: 403 }
+        { status: 401 }
       );
     }
 

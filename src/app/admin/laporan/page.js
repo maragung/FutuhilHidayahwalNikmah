@@ -25,7 +25,7 @@ export default function LaporanPage() {
   const [warnaNonSubsidi, setWarnaNonSubsidi] = useState('#04B816');
 
   const tipeLaporan = [
-    { value: 'santri', label: 'Daftar Santri' },
+    { value: 'santri', label: 'Data Santri' },
     { value: 'pembayaran', label: 'Laporan Pembayaran SPP' },
     { value: 'status_pembayaran', label: 'Status Pembayaran Per Santri' },
     { value: 'pembayaran_lain', label: 'Laporan Pembayaran Lain' },
@@ -521,7 +521,7 @@ export default function LaporanPage() {
             <h3 className="font-semibold text-gray-800 mb-3">Deskripsi Laporan</h3>
             <div className="space-y-3">
               <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-blue-900">Daftar Santri</p>
+                <p className="text-sm font-medium text-blue-900">Data Santri</p>
                 <p className="text-xs text-blue-700 mt-1">
                   Daftar lengkap semua santri aktif dengan informasi lengkap
                 </p>
