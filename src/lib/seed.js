@@ -17,6 +17,10 @@ const {
   Pengaturan,
   Kegiatan,
   PembayaranLain,
+  Absensi,
+  EmailServer,
+  EmailLog,
+  Log,
 } = require('./models');
 
 const ROLES_DEFAULT = [
@@ -38,6 +42,9 @@ async function seed() {
     // Disable foreign key checks to allow truncation
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0', { transaction: t });
 
+    await EmailLog.destroy({ where: {}, truncate: true, force: true, transaction: t });
+    await EmailServer.destroy({ where: {}, truncate: true, force: true, transaction: t });
+    await Absensi.destroy({ where: {}, truncate: true, force: true, transaction: t });
     await PembayaranLain.destroy({ where: {}, truncate: true, force: true, transaction: t });
     await PembayaranSPP.destroy({ where: {}, truncate: true, force: true, transaction: t });
     await InfakSedekah.destroy({ where: {}, truncate: true, force: true, transaction: t });
@@ -46,6 +53,7 @@ async function seed() {
     await Backup.destroy({ where: {}, truncate: true, force: true, transaction: t });
     await Saran.destroy({ where: {}, truncate: true, force: true, transaction: t });
     await Kegiatan.destroy({ where: {}, truncate: true, force: true, transaction: t });
+    await Log.destroy({ where: {}, truncate: true, force: true, transaction: t });
     await Santri.destroy({ where: {}, truncate: true, force: true, transaction: t });
     await Pengaturan.destroy({ where: {}, truncate: true, force: true, transaction: t });
     await Admin.destroy({ where: {}, truncate: true, force: true, transaction: t });

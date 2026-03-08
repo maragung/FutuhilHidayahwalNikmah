@@ -29,7 +29,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
     }
 
-    if (!['Pimpinan TPQ', 'Bendahara'].includes(auth.user.jabatan)) {
+    if (!['Developer', 'Pimpinan TPQ', 'Bendahara'].includes(auth.user.jabatan)) {
       return NextResponse.json({ success: false, pesan: 'Akses ditolak' }, { status: 403 });
     }
 

@@ -12,11 +12,6 @@ export default function PengaturanPage() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Email / SMTP state
-  const [emailStatus, setEmailStatus] = useState(null);
-  const [testEmailLoading, setTestEmailLoading] = useState(false);
-  const [testEmailResult, setTestEmailResult] = useState(null);
-
   const settingsConfig = [
     { key: 'nama_tpq', label: 'Nama TPQ', type: 'text', placeholder: 'Nama TPQ' },
     { key: 'nominal_spp_non_subsidi', label: 'Biaya SPP Non Subsidi (Rp)', type: 'number', placeholder: '40000' },
@@ -31,39 +26,7 @@ export default function PengaturanPage() {
   useEffect(() => {
     fetchSettings();
     fetchCurrentUser();
-    fetchEmailStatus();
   }, []);
-
-  const fetchEmailStatus = async () => {
-    const token = localStorage.getItem('auth_token');
-    try {
-      const res = await fetch('/api/pengaturan/test-email', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) setEmailStatus(data.data);
-    } catch { /* ignore */ }
-  };
-
-  const handleTestEmail = async () => {
-    setTestEmailLoading(true);
-    setTestEmailResult(null);
-    const token = localStorage.getItem('auth_token');
-    try {
-      const res = await fetch('/api/pengaturan/test-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: currentUser?.email }),
-      });
-      const data = await res.json();
-      setTestEmailResult({ success: data.success, message: data.pesan || data.message || (data.success ? 'Berhasil' : 'Gagal') });
-      if (data.success) fetchEmailStatus();
-    } catch (e) {
-      setTestEmailResult({ success: false, message: 'Gagal terhubung ke server' });
-    } finally {
-      setTestEmailLoading(false);
-    }
-  };
 
   const fetchCurrentUser = async () => {
     const token = localStorage.getItem('auth_token');
@@ -134,7 +97,6 @@ export default function PengaturanPage() {
         setSuccess('Pengaturan berhasil disimpan!');
         setShowPinModal(false);
         setPin('');
-        fetchEmailStatus(); // refresh status email setelah simpan
       } else {
         setError(data.pesan);
       }
@@ -315,100 +277,21 @@ export default function PengaturanPage() {
         </div>
       </div>
 
-      {/* Notifikasi Email */}
-      <div className="card">
-        <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-          Notifikasi Email
-        </h3>
-
-        {/* Status + info baris atas */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          {emailStatus === null ? (
-            <span className="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-500">Memeriksa...</span>
-          ) : emailStatus.configured ? (
-            <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium bg-green-100 text-green-700">
-              <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
-              Server aktif
-              {emailStatus.source && <span className="opacity-70">· {emailStatus.source}</span>}
-              {emailStatus.host && <span className="opacity-70">· {emailStatus.host}</span>}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium bg-red-100 text-red-600">
-              <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
-              Server tidak aktif
-            </span>
-          )}
-          <button
-            onClick={fetchEmailStatus}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-            title="Refresh status"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      {/* Notifikasi Email — link ke halaman Developer */}
+      {currentUser?.jabatan === 'Developer' && (
+        <div className="card bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+          <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-          </button>
+            Notifikasi Email
+          </h3>
+          <p className="text-sm text-gray-600 mb-3">Kelola server email utama & cadangan, lihat log pengiriman, dan export laporan.</p>
+          <a href="/admin/notifikasi-email" className="btn btn-secondary w-full text-center text-sm">
+            Kelola Server Email →
+          </a>
         </div>
-
-        <p className="text-sm text-gray-500 mb-4">
-          Email pemberitahuan dikirim ke admin yang mengaktifkan <strong>Terima email perubahan</strong> di halaman Akun.
-          Kredensial SMTP dikonfigurasi melalui environment variable / Vercel.
-          Opsi di bawah hanya untuk override host dan port jika diperlukan.
-        </p>
-
-        {/* Override host + port (opsional) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              SMTP Host <span className="text-xs text-gray-400 font-normal">(opsional, override env)</span>
-            </label>
-            <input
-              type="text"
-              value={settings.smtp_host || ''}
-              onChange={(e) => handleChange('smtp_host', e.target.value)}
-              placeholder="Kosongkan untuk pakai env var"
-              className="input-field"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              SMTP Port <span className="text-xs text-gray-400 font-normal">(opsional, override env)</span>
-            </label>
-            <input
-              type="number"
-              value={settings.smtp_port || ''}
-              onChange={(e) => handleChange('smtp_port', e.target.value)}
-              placeholder="587"
-              className="input-field"
-            />
-          </div>
-        </div>
-
-        {/* Hasil test email */}
-        {testEmailResult && (
-          <div className={`p-3 rounded-lg border mb-4 text-sm ${testEmailResult.success ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-            {testEmailResult.success ? '✓ ' : '✗ '}{testEmailResult.message}
-            {testEmailResult.success && currentUser?.email && (
-              <span className="text-green-600 ml-1">→ {currentUser.email}</span>
-            )}
-          </div>
-        )}
-
-        {/* Tombol test */}
-        <button
-          onClick={handleTestEmail}
-          disabled={testEmailLoading || !emailStatus?.configured}
-          className="btn btn-secondary flex items-center gap-2 text-sm"
-          title={!emailStatus?.configured ? 'SMTP belum terkonfigurasi' : `Kirim ke ${currentUser?.email || 'email Anda'}`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-          {testEmailLoading ? 'Mengirim...' : `Kirim Email Test${currentUser?.email ? ` ke ${currentUser.email}` : ''}`}
-        </button>
-      </div>
+      )}
 
       {/* PIN Modal */}
       {showPinModal && (

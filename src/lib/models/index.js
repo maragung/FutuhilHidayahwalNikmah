@@ -12,6 +12,9 @@ const Pengaturan = require('./Pengaturan');
 const Kegiatan = require('./Kegiatan');
 const PembayaranLain = require('./PembayaranLain');
 const Log = require('./Log');
+const Absensi = require('./Absensi');
+const EmailServer = require('./EmailServer');
+const EmailLog = require('./EmailLog');
 
 // Relasi Role
 Role.hasMany(Admin, { foreignKey: 'role_id', as: 'admins' });
@@ -59,6 +62,16 @@ PembayaranLain.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
 PembayaranLain.belongsTo(Santri, { foreignKey: 'santri_id', as: 'santri' });
 PembayaranLain.belongsTo(Kegiatan, { foreignKey: 'kegiatan_id', as: 'kegiatan' });
 
+// Relasi Absensi
+Santri.hasMany(Absensi, { foreignKey: 'santri_id', as: 'absensi' });
+Admin.hasMany(Absensi, { foreignKey: 'admin_id', as: 'absensiDicatat' });
+Absensi.belongsTo(Santri, { foreignKey: 'santri_id', as: 'santri' });
+Absensi.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
+
+// Relasi EmailLog → EmailServer
+EmailServer.hasMany(EmailLog, { foreignKey: 'email_server_id', as: 'logs' });
+EmailLog.belongsTo(EmailServer, { foreignKey: 'email_server_id', as: 'server' });
+
 module.exports = {
   sequelize,
   Admin,
@@ -74,4 +87,7 @@ module.exports = {
   Kegiatan,
   PembayaranLain,
   Log,
+  Absensi,
+  EmailServer,
+  EmailLog,
 };
