@@ -80,11 +80,3 @@ export async function POST(request) {
     );
   }
 }
-  } catch (error) {
-    console.error('App login error:', error);
-    return NextResponse.json(
-      { success: false, pesan: 'Terjadi kesalahan server' },
-      { status: 500 }
-    );
-  }
-}
