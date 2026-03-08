@@ -56,6 +56,7 @@ Salin template berikut ke file `.env.local` di root project:
 
 ```env
 NODE_ENV=development
+DEV_SECRET=xxxxxxxxxxxxxx
 
 # ── Database ──────────────────────────────────────────
 DB_HOST=localhost
@@ -123,6 +124,7 @@ Gunakan provider MySQL cloud: **Aiven**, **PlanetScale**, **Railway**, atau **Tu
 **Wajib:**
 
 ```
+
 JWT_SECRET=...
 JWT_EXPIRES_IN=7d
 DB_HOST=...
