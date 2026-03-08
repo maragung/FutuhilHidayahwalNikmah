@@ -1,17 +1,34 @@
 import jwt from 'jsonwebtoken';
 
-const DEV_FALLBACK_JWT_SECRET = 'dev-only-jwt-secret-tpq-futuhil-hidayah';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 function resolveJwtSecret() {
   const secret = process.env.JWT_SECRET;
-  if (secret) return secret;
+  if (secret && secret.length >= 32) return secret;
 
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET harus diatur pada environment production');
+    throw new Error('JWT_SECRET harus diatur di environment production (minimal 32 karakter)');
   }
 
-  return DEV_FALLBACK_JWT_SECRET;
+  // Development only: remind developer to set JWT_SECRET
+  if (!secret) {
+    console.warn(
+      '[auth] WARNING: JWT_SECRET tidak diset. ' +
+      'Tambahkan JWT_SECRET ke .env.local (minimal 32 karakter). ' +
+      'Server akan GAGAL di production tanpa variabel ini.',
+    );
+    // Generate a process-lifetime random secret so it is never a
+    // guessable constant and is invalidated on every server restart.
+    if (!globalThis.__DEV_JWT_SECRET__) {
+      const { randomBytes } = require('crypto');
+      globalThis.__DEV_JWT_SECRET__ = randomBytes(48).toString('hex');
+    }
+    return globalThis.__DEV_JWT_SECRET__;
+  }
+
+  // Secret exists but < 32 chars
+  console.warn('[auth] WARNING: JWT_SECRET terlalu pendek (minimal 32 karakter).');
+  return secret;
 }
 
 export function generateToken(payload, expiresIn = JWT_EXPIRES_IN) {

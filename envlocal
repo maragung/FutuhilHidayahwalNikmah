@@ -11,7 +11,9 @@ DB_USER=root
 DB_PASSWORD=
 
 # JWT
-JWT_SECRET=change_this_to_a_long_random_string
+# WAJIB: minimal 32 karakter acak, JANGAN gunakan nilai default ini di production
+# Generate: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+JWT_SECRET=GANTI_INI_dengan_string_acak_minimal_32_karakter_sebelum_deploy
 JWT_EXPIRES_IN=7d
 
 # Dev Audit Tool — set a strong random value, keep it SECRET

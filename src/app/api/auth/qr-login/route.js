@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import Admin from '@/lib/models/Admin';
-import { createAuthResponse } from '@/lib/auth';
 import sequelize from '@/lib/db';
 import QRCode from 'qrcode';
+import { createNonce } from '@/lib/qr-nonce';
 
 export async function POST(request) {
   try {
@@ -29,34 +29,35 @@ export async function POST(request) {
       return NextResponse.json({ success: false, pesan: 'Password tidak valid' }, { status: 403 });
     }
 
-    // Bangun server URL dari header request
-    const host = request.headers.get('host') || 'localhost:3000';
-    const proto = request.headers.get('x-forwarded-proto') || 'http';
+    // Build server URL from request headers
+    const host      = request.headers.get('host') || 'localhost:3000';
+    const proto     = request.headers.get('x-forwarded-proto') || 'http';
     const serverUrl = `${proto}://${host}`;
 
-    const authData = createAuthResponse(admin, '30d');
-    const deepLink = `tpqlink://login?token=${encodeURIComponent(authData.token)}&user=${admin.id}&server=${encodeURIComponent(serverUrl)}`;
+    // ── One-time nonce: valid 2 minutes, single-use ───────────────────────────
+    // The QR code does NOT contain the JWT token — only a short-lived nonce.
+    // The Flutter app exchanges this nonce for a real 30-day token via
+    // POST /api/auth/qr-exchange. A screenshot of the QR is useless after
+    // 2 minutes or after the first successful scan.
+    const nonce    = createNonce(admin.id, serverUrl);
+    const deepLink = `tpqlink://qr-exchange?nonce=${nonce}&server=${encodeURIComponent(serverUrl)}`;
 
-    // Buat QR code sebagai base64 data URL
+    // Build QR image
     const qrDataUrl = await QRCode.toDataURL(deepLink, {
       errorCorrectionLevel: 'M',
       width: 300,
       margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
+      color: { dark: '#000000', light: '#FFFFFF' },
     });
 
     return NextResponse.json({
       success: true,
-      pesan: 'QR login berhasil dibuat',
+      pesan: 'QR login berhasil dibuat (berlaku 2 menit)',
       data: {
         qr_data_url: qrDataUrl,
-        deep_link: deepLink,
-        server_url: serverUrl,
-        token: authData.token,
-        expires_in_days: 30,
+        server_url:  serverUrl,
+        expires_in_seconds: 120,
+        // deep_link intentionally omitted from response to prevent leakage
       },
     });
   } catch (error) {
@@ -64,3 +65,4 @@ export async function POST(request) {
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }
 }
+
