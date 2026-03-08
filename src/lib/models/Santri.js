@@ -42,7 +42,12 @@ const Santri = sequelize.define('Santri', {
     type: DataTypes.STRING(100),
     allowNull: true,
     validate: {
-      isEmail: true,
+      isEmailOrEmpty(value) {
+        if (value && value.length > 0) {
+          const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!re.test(value)) throw new Error('Format email tidak valid');
+        }
+      },
     },
   },
   tgl_mendaftar: {
@@ -62,6 +67,16 @@ const Santri = sequelize.define('Santri', {
   tgl_nonaktif: {
     type: DataTypes.DATEONLY,
     allowNull: true,
+  },
+  status_lulus: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: 'Apakah santri sudah lulus / khatam',
+  },
+  tgl_lulus: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    comment: 'Tanggal lulus / khatam',
   },
 }, {
   tableName: 'santri',

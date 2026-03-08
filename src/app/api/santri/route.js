@@ -38,8 +38,15 @@ export async function GET(request) {
     
     if (status === 'aktif') {
       where.status_aktif = true;
+      where.status_lulus = false;
     } else if (status === 'nonaktif') {
       where.status_aktif = false;
+      where.status_lulus = false;
+    } else if (status === 'lulus') {
+      where.status_lulus = true;
+    } else {
+      // 'all' — tetap exclude lulus kecuali diminta
+      where.status_lulus = false;
     }
 
     if (bulanDaftarIni) {
@@ -124,10 +131,10 @@ export async function POST(request) {
       nik,
       nama_lengkap,
       jilid: jilid || 'Jilid 1',
-      alamat,
-      nama_wali,
-      no_telp_wali,
-      email_wali,
+      alamat: alamat || null,
+      nama_wali: nama_wali || null,
+      no_telp_wali: no_telp_wali || null,
+      email_wali: email_wali || null,
       tgl_mendaftar: tgl_mendaftar || new Date(),
       status_aktif: true,
       is_subsidi: Boolean(is_subsidi),
