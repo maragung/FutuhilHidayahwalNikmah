@@ -28,9 +28,11 @@ export async function GET(request) {
     const where = {};
     
     if (search) {
+      // Escape SQL LIKE wildcards to prevent wildcard injection
+      const safeSearch = search.replace(/[%_\\]/g, '\\$&');
       where[Op.or] = [
-        { nama_lengkap: { [Op.like]: `%${search}%` } },
-        { nik: { [Op.like]: `%${search}%` } },
+        { nama_lengkap: { [Op.like]: `%${safeSearch}%` } },
+        { nik: { [Op.like]: `%${safeSearch}%` } },
       ];
     }
     

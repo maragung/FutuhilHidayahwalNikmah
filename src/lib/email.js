@@ -26,93 +26,113 @@ function formatWibDdMmYyHm(date = new Date()) {
   return `${get('day')}${get('month')}${get('year')} ${get('hour')}:${get('minute')} WIB`;
 }
 
-async function tulisLogEmailGagal(message, detail) {
+/* ── Tulis log ke tabel email_logs ─────────────────────────────────────────── */
+async function tulisEmailLog({ serverId, serverNama, dari, kepada, subjek, status, errorMessage, response, konteks }) {
   try {
-    const { Log } = await import('./models');
-    await Log.create({
-      level: 'ERROR',
-      context: 'EMAIL',
-      message,
-      detail: typeof detail === 'string' ? detail : JSON.stringify(detail),
+    const { EmailLog } = await import('./models');
+    await EmailLog.create({
+      email_server_id: serverId || null,
+      server_nama: serverNama || null,
+      dari: dari || null,
+      kepada: kepada || '',
+      subjek: subjek || '',
+      status,
+      error_message: errorMessage || null,
+      response: response || null,
+      konteks: konteks || 'SYSTEM',
     });
   } catch (err) {
-    console.error('Gagal tulis log email:', err);
+    console.error('Gagal tulis email log:', err);
   }
 }
 
-async function tulisLogEmailSukses(message, detail) {
+/* Backward-compat: juga tulis ke tabel logs lama */
+async function tulisLogLama(level, message, detail) {
   try {
     const { Log } = await import('./models');
     await Log.create({
-      level: 'INFO',
+      level,
       context: 'EMAIL',
       message,
       detail: typeof detail === 'string' ? detail : JSON.stringify(detail),
     });
   } catch (err) {
-    console.error('Gagal tulis log email:', err);
+    console.error('Gagal tulis log email (legacy):', err);
   }
 }
 
 /**
- * Ambil override SMTP host/port dari Pengaturan DB.
- * Kredensial (user/pass/from/secure) hanya dari env vars — tidak disimpan di DB.
+ * Ambil daftar EmailServer dari DB, diurutkan: primary dulu, lalu backup, berdasarkan urutan ASC.
+ * Fallback ke env vars jika tabel kosong / belum ada.
  */
-async function getSmtpFromDb() {
+async function getActiveServers() {
   try {
-    const { Pengaturan } = await import('./models');
-    const keys = ['smtp_host', 'smtp_port'];
-    const rows = await Pengaturan.findAll({ where: { kunci: keys } });
-    const cfg = {};
-    rows.forEach((r) => { cfg[r.kunci] = r.nilai; });
-    return cfg;
-  } catch {
-    return {};
+    const { EmailServer } = await import('./models');
+    const servers = await EmailServer.findAll({
+      where: { is_active: true },
+      order: [
+        ['tipe', 'ASC'],   // 'backup' > 'primary' secara alfabet, tapi kita urutkan urutan juga
+        ['urutan', 'ASC'],
+      ],
+    });
+
+    if (servers.length > 0) {
+      // Urutkan: primary (urutan 0,1,...) lalu backup (urutan 0,1,...)
+      const primary = servers.filter(s => s.tipe === 'primary').sort((a, b) => a.urutan - b.urutan);
+      const backup  = servers.filter(s => s.tipe === 'backup').sort((a, b) => a.urutan - b.urutan);
+      return [...primary, ...backup];
+    }
+  } catch { /* tabel belum ada / error → fallback env */ }
+
+  // Fallback ke environment variables (backward compatible)
+  const envServers = [];
+
+  const user1 = process.env.GMAIL_EMAIL || process.env.SMTP_USER || '';
+  const host1 = process.env.GMAIL_SMTP_HOST || process.env.SMTP_HOST || '';
+  if (user1) {
+    envServers.push({
+      id: null,
+      nama: 'ENV: Primary',
+      tipe: 'primary',
+      smtp_host: host1 || 'smtp.gmail.com',
+      smtp_port: parseInt(process.env.GMAIL_SMTP_PORT || process.env.SMTP_PORT || '587'),
+      smtp_user: user1,
+      smtp_pass: process.env.GMAIL_PASSWORD || process.env.SMTP_PASS || '',
+      smtp_from: process.env.GMAIL_FROM || process.env.SMTP_FROM || user1,
+      smtp_secure: (process.env.GMAIL_SMTP_SECURE || process.env.SMTP_SECURE || 'false') === 'true',
+    });
   }
+
+  const user2 = process.env.OUTLOOK_EMAIL || process.env.SMTP2_USER || '';
+  const host2 = process.env.OUTLOOK_SMTP_HOST || process.env.SMTP2_HOST || '';
+  if (user2 && host2) {
+    envServers.push({
+      id: null,
+      nama: 'ENV: Backup',
+      tipe: 'backup',
+      smtp_host: host2,
+      smtp_port: parseInt(process.env.OUTLOOK_SMTP_PORT || process.env.SMTP2_PORT || '587'),
+      smtp_user: user2,
+      smtp_pass: process.env.OUTLOOK_PASSWORD || process.env.SMTP2_PASS || '',
+      smtp_from: user2,
+      smtp_secure: (process.env.OUTLOOK_SMTP_SECURE || process.env.SMTP2_SECURE || 'false') === 'true',
+    });
+  }
+
+  return envServers;
 }
 
-// Transporter utama (dari env vars atau DB)
-async function createPrimaryTransporter() {
-  const dbCfg = await getSmtpFromDb();
-
-  const host = process.env.GMAIL_SMTP_HOST || process.env.SMTP_HOST || dbCfg.smtp_host || 'smtp.gmail.com';
-  const port = parseInt(process.env.GMAIL_SMTP_PORT || process.env.SMTP_PORT || dbCfg.smtp_port || '587');
-  const secure = (process.env.GMAIL_SMTP_SECURE || process.env.SMTP_SECURE || (port === 465 ? 'true' : 'false')) === 'true';
-  const user = process.env.GMAIL_EMAIL || process.env.SMTP_USER || '';
-  const pass = process.env.GMAIL_PASSWORD || process.env.SMTP_PASS || '';
-  const from = process.env.GMAIL_FROM || process.env.SMTP_FROM || user || 'noreply@tpq.local';
-
-  const transportConfig = {
-    host,
-    port,
-    secure,
-    auth: user ? { user, pass } : undefined,
-    // Wajibkan STARTTLS pada port 587 agar koneksi selalu terenkripsi
-    requireTLS: !secure && port === 587,
-    tls: {
-      // Verifikasi sertifikat server — jangan izinkan sertifikat palsu
-      rejectUnauthorized: process.env.NODE_ENV === 'production',
-      minVersion: 'TLSv1.2',
-    },
-  };
-
-  return { transporter: nodemailer.createTransport(transportConfig), from, hasAuth: Boolean(user) };
-}
-
-// Transporter cadangan (Hotmail / Outlook / SMTP server 2)
-function createBackupTransporter() {
-  if (!(process.env.OUTLOOK_SMTP_HOST || process.env.SMTP2_HOST)) return null;
-  const host = process.env.OUTLOOK_SMTP_HOST || process.env.SMTP2_HOST;
-  const port = parseInt(process.env.OUTLOOK_SMTP_PORT || process.env.SMTP2_PORT || '587');
-  const secure = (process.env.OUTLOOK_SMTP_SECURE || process.env.SMTP2_SECURE || (port === 465 ? 'true' : 'false')) === 'true';
-  const user = process.env.OUTLOOK_EMAIL || process.env.SMTP2_USER;
-  const pass = process.env.OUTLOOK_PASSWORD || process.env.SMTP2_PASS;
-
+/**
+ * Buat nodemailer transporter dari objek server config.
+ */
+function createTransporterFromConfig(srv) {
+  const port = parseInt(srv.smtp_port) || 587;
+  const secure = Boolean(srv.smtp_secure) || port === 465;
   return nodemailer.createTransport({
-    host,
+    host: srv.smtp_host,
     port,
     secure,
-    auth: user ? { user, pass } : undefined,
+    auth: srv.smtp_user ? { user: srv.smtp_user, pass: srv.smtp_pass } : undefined,
     requireTLS: !secure && port === 587,
     tls: {
       rejectUnauthorized: process.env.NODE_ENV === 'production',
@@ -122,58 +142,72 @@ function createBackupTransporter() {
 }
 
 /**
- * Kirim email dengan fallback ke server cadangan
+ * Kirim email dengan failover: coba server pertama, lalu kedua, dst.
+ * Setiap percobaan di-log ke email_logs.
+ * @param {object} mailOptions - nodemailer mail options
+ * @param {string} [konteks='SYSTEM'] - konteks untuk log
  */
-async function kirimEmail(mailOptions) {
-  try {
-    const { transporter, from, hasAuth } = await createPrimaryTransporter();
+async function kirimEmail(mailOptions, konteks = 'SYSTEM') {
+  const servers = await getActiveServers();
 
-    if (!hasAuth && process.env.NODE_ENV !== 'development') {
-      const msg = '[EMAIL] SMTP belum dikonfigurasi. Set SMTP_HOST/SMTP_USER/SMTP_PASS di .env.local atau di menu Pengaturan.';
-      console.warn(msg);
-      await tulisLogEmailGagal('SMTP tidak dikonfigurasi', { subject: mailOptions.subject, to: mailOptions.to });
-      return { success: false, message: 'Email tidak dikonfigurasi' };
-    }
+  if (servers.length === 0) {
+    const msg = '[EMAIL] Tidak ada email server yang dikonfigurasi. Tambahkan di menu Developer → Notifikasi Email, atau set env.';
+    console.warn(msg);
+    await tulisEmailLog({
+      kepada: mailOptions.to,
+      subjek: mailOptions.subject,
+      status: 'failed',
+      errorMessage: 'Tidak ada email server yang aktif',
+      konteks,
+    });
+    await tulisLogLama('ERROR', 'Tidak ada email server yang aktif', { subject: mailOptions.subject, to: mailOptions.to });
+    return { success: false, message: 'Email tidak dikonfigurasi' };
+  }
+
+  const errors = [];
+
+  for (const srv of servers) {
+    const transporter = createTransporterFromConfig(srv);
+    const from = mailOptions.from || srv.smtp_from || srv.smtp_user || 'noreply@tpq.local';
 
     try {
-      const info = await transporter.sendMail({ ...mailOptions, from: mailOptions.from || from });
-      console.log(`[EMAIL] Terkirim ke ${mailOptions.to} | Subject: ${mailOptions.subject} | ID: ${info.messageId || '-'}`);
-      await tulisLogEmailSukses('Email berhasil dikirim', { subject: mailOptions.subject, to: mailOptions.to, messageId: info.messageId });
-      return { success: true, messageId: info.messageId, server: 'primary' };
-    } catch (primaryError) {
-      console.error('[EMAIL] Server utama gagal:', primaryError.message);
+      const info = await transporter.sendMail({ ...mailOptions, from });
+      console.log(`[EMAIL] Terkirim via "${srv.nama}" ke ${mailOptions.to} | Subject: ${mailOptions.subject}`);
 
-      const backup = createBackupTransporter();
-      if (backup) {
-        const fromBackup = process.env.OUTLOOK_EMAIL || process.env.SMTP2_USER || from;
-        try {
-          const info = await backup.sendMail({ ...mailOptions, from: fromBackup });
-          console.log(`[EMAIL] Terkirim via server cadangan | Subject: ${mailOptions.subject}`);
-          await tulisLogEmailSukses('Email dikirim via server cadangan', { subject: mailOptions.subject, to: mailOptions.to });
-          return { success: true, messageId: info.messageId, server: 'backup' };
-        } catch (backupError) {
-          console.error('[EMAIL] Server cadangan gagal:', backupError.message);
-          await tulisLogEmailGagal('Gagal kirim email (utama & cadangan)', {
-            primary: primaryError.message,
-            backup: backupError.message,
-            subject: mailOptions.subject,
-            to: mailOptions.to,
-          });
-          return { success: false, error: `Utama: ${primaryError.message}, Cadangan: ${backupError.message}` };
-        }
-      }
-
-      await tulisLogEmailGagal('Gagal kirim email (server cadangan tidak tersedia)', {
-        primary: primaryError.message,
-        subject: mailOptions.subject,
-        to: mailOptions.to,
+      await tulisEmailLog({
+        serverId: srv.id,
+        serverNama: srv.nama,
+        dari: from,
+        kepada: mailOptions.to,
+        subjek: mailOptions.subject,
+        status: 'success',
+        response: info.messageId || null,
+        konteks,
       });
-      return { success: false, error: primaryError.message };
+      await tulisLogLama('INFO', `Email terkirim via ${srv.nama}`, { subject: mailOptions.subject, to: mailOptions.to, messageId: info.messageId });
+
+      return { success: true, messageId: info.messageId, server: srv.nama, tipe: srv.tipe };
+    } catch (err) {
+      console.error(`[EMAIL] Server "${srv.nama}" gagal:`, err.message);
+      errors.push({ server: srv.nama, tipe: srv.tipe, error: err.message });
+
+      await tulisEmailLog({
+        serverId: srv.id,
+        serverNama: srv.nama,
+        dari: from,
+        kepada: mailOptions.to,
+        subjek: mailOptions.subject,
+        status: 'failed',
+        errorMessage: err.message,
+        konteks,
+      });
     }
-  } catch (err) {
-    console.error('[EMAIL] Error konfigurasi:', err.message);
-    return { success: false, error: err.message };
   }
+
+  // Semua server gagal
+  const errSummary = errors.map(e => `${e.server}: ${e.error}`).join(' | ');
+  await tulisLogLama('ERROR', `Semua server email gagal (${errors.length} server)`, { errors, subject: mailOptions.subject, to: mailOptions.to });
+  return { success: false, error: errSummary };
 }
 
 /**
@@ -302,19 +336,32 @@ async function getEmailAdminByJabatan(jabatanList) {
 }
 
 /**
- * Cek status konfigurasi email
+ * Cek status konfigurasi email — sekarang baca dari EmailServer tabel
  */
 async function getEmailConfigStatus() {
-  const dbCfg = await getSmtpFromDb();
-  // Kredensial hanya dari env vars
-  const user = process.env.GMAIL_EMAIL || process.env.SMTP_USER || '';
-  // Host: env vars lebih utama, DB hanya sebagai override opsional
-  const host = process.env.GMAIL_SMTP_HOST || process.env.SMTP_HOST || dbCfg.smtp_host || '';
+  const servers = await getActiveServers();
+  if (servers.length === 0) {
+    return { configured: false, source: 'none', host: null, user: null, servers: [] };
+  }
+
+  const primary = servers.find(s => s.tipe === 'primary') || servers[0];
+  const masked = primary.smtp_user ? primary.smtp_user.replace(/(.{3}).*@/, '$1***@') : null;
+
   return {
-    configured: Boolean(user && host),
-    source: (process.env.GMAIL_EMAIL || process.env.SMTP_USER) ? 'env' : 'none',
-    host: host || null,
-    user: user ? user.replace(/(.{3}).*@/, '$1***@') : null,
+    configured: true,
+    source: primary.id ? 'database' : 'env',
+    host: primary.smtp_host || null,
+    user: masked,
+    servers: servers.map(s => ({
+      id: s.id,
+      nama: s.nama,
+      tipe: s.tipe,
+      host: s.smtp_host,
+      port: s.smtp_port,
+      user: s.smtp_user ? s.smtp_user.replace(/(.{3}).*@/, '$1***@') : null,
+      secure: s.smtp_secure,
+      active: true,
+    })),
   };
 }
 
@@ -324,7 +371,7 @@ async function getEmailConfigStatus() {
 async function kirimEmailTest(toEmail) {
   const status = await getEmailConfigStatus();
   if (!status.configured) {
-    return { success: false, error: 'SMTP belum dikonfigurasi. Set GMAIL_EMAIL dan GMAIL_SMTP_HOST di environment variable.' };
+    return { success: false, error: 'Tidak ada email server yang dikonfigurasi. Tambahkan di menu Developer → Notifikasi Email.' };
   }
   return kirimEmail({
     to: toEmail,
@@ -337,7 +384,7 @@ async function kirimEmailTest(toEmail) {
         <p>Notifikasi email sistem TPQ <strong>Futuhil Hidayah Wal Hikmah</strong> berfungsi dengan baik.</p>
         <p style="color: #6b7280; font-size: 12px;">Dikirim pada: ${formatWibDdMmYyHm(new Date())}</p>
       </div>`,
-  });
+  }, 'TEST');
 }
 
 export {

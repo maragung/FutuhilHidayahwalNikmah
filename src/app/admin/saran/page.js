@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { SkeletonList } from '@/components/SkeletonLoader';
 
 export default function SaranPage() {
   const [loading, setLoading] = useState(true);
@@ -246,10 +247,7 @@ export default function SaranPage() {
         {/* List Saran */}
         <div className="space-y-3">
           {loading ? (
-            <div className="card text-center py-12">
-              <div className="animate-spin w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full mx-auto"></div>
-              <p className="text-gray-500 mt-3">Memuat data...</p>
-            </div>
+            <SkeletonList count={5} />
           ) : saranList.length === 0 ? (
             <div className="card text-center py-12">
               <svg className="w-16 h-16 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
