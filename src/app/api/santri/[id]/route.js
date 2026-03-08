@@ -5,8 +5,8 @@ import sequelize from '@/lib/db';
 import { createBackup } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
-const ROLE_BISA_KELOLA_STATUS = ['Pimpinan TPQ', 'Sekretaris', 'Bendahara'];
-const ROLE_BISA_EDIT_SANTRI   = ['Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
+const ROLE_BISA_KELOLA_STATUS = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
+const ROLE_BISA_EDIT_SANTRI   = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
 
 // GET - Ambil santri berdasarkan ID (auth required)
 export async function GET(request, { params }) {
@@ -95,6 +95,7 @@ export async function PUT(request, { params }) {
       );
     }
 
+    // Handle perubahan status_aktif
     if (updateData.status_aktif !== undefined) {
       if (!ROLE_BISA_KELOLA_STATUS.includes(auth.user.jabatan)) {
         return NextResponse.json(
@@ -107,6 +108,25 @@ export async function PUT(request, { params }) {
         updateData.tgl_nonaktif = new Date().toISOString().split('T')[0];
       } else {
         updateData.tgl_nonaktif = null;
+      }
+    }
+
+    // Handle perubahan status_lulus
+    if (updateData.status_lulus !== undefined) {
+      if (!ROLE_BISA_KELOLA_STATUS.includes(auth.user.jabatan)) {
+        return NextResponse.json(
+          { success: false, pesan: 'Tidak memiliki akses untuk ubah status lulus santri' },
+          { status: 403 }
+        );
+      }
+
+      if (Boolean(updateData.status_lulus) === true) {
+        updateData.tgl_lulus = updateData.tgl_lulus || new Date().toISOString().split('T')[0];
+        // Santri lulus otomatis nonaktif dari SPP
+        updateData.status_aktif = false;
+        updateData.tgl_nonaktif = updateData.tgl_lulus;
+      } else {
+        updateData.tgl_lulus = null;
       }
     }
 
@@ -123,9 +143,13 @@ export async function PUT(request, { params }) {
     // Kirim salinan ke Pimpinan TPQ & Sekretaris
     try {
       const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
+      const aksiLabel = updateData.status_lulus ? 'Santri Ditandai Lulus' : 'Update Data Santri';
+      const deskripsiLabel = updateData.status_lulus
+        ? `Santri ${santri.nama_lengkap} ditandai sebagai LULUS`
+        : `Data santri ${santri.nama_lengkap} diperbarui`;
       await kirimEmailAksiAdmin({
-        aksi: 'Update Data Santri',
-        deskripsi: `Data santri ${santri.nama_lengkap} diperbarui`,
+        aksi: aksiLabel,
+        deskripsi: deskripsiLabel,
         detail: '',
         adminNama: auth.user.nama_lengkap,
         adminJabatan: auth.user.jabatan,
@@ -137,7 +161,7 @@ export async function PUT(request, { params }) {
     
     return NextResponse.json({
       success: true,
-      pesan: 'Santri berhasil diupdate',
+      pesan: updateData.status_lulus ? 'Santri berhasil ditandai lulus' : 'Santri berhasil diupdate',
       data: santri,
     });
   } catch (error) {

@@ -99,27 +99,36 @@ export default function DaftarSantriPage() {
     const token = localStorage.getItem('auth_token');
 
     try {
-      const isAktifkan = statusAction === 'aktifkan';
-      const res = await fetch(`/api/santri/${selectedSantri.id}`, isAktifkan ? {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status_aktif: true, pin })
-      } : {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ pin })
-      });
+      let res;
+      if (statusAction === 'aktifkan') {
+        res = await fetch(`/api/santri/${selectedSantri.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ status_aktif: true, pin }),
+        });
+      } else if (statusAction === 'luluskan') {
+        res = await fetch(`/api/santri/${selectedSantri.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ status_lulus: true, pin }),
+        });
+      } else {
+        res = await fetch(`/api/santri/${selectedSantri.id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ pin }),
+        });
+      }
 
       const data = await res.json();
 
       if (data.success) {
-        setSuccess(isAktifkan ? 'Santri berhasil diaktifkan kembali' : 'Santri berhasil dinonaktifkan');
+        const pesanSukses = statusAction === 'aktifkan'
+          ? 'Santri berhasil diaktifkan kembali'
+          : statusAction === 'luluskan'
+          ? 'Santri berhasil ditandai lulus'
+          : 'Santri berhasil dinonaktifkan';
+        setSuccess(pesanSukses);
         setShowDeleteModal(false);
         setPin('');
         setSelectedSantri(null);
@@ -128,7 +137,7 @@ export default function DaftarSantriPage() {
         setError(data.pesan);
       }
     } catch (err) {
-      setError('Gagal menghapus santri');
+      setError('Gagal memproses');
     } finally {
       setDeleteLoading(false);
     }
@@ -258,7 +267,7 @@ export default function DaftarSantriPage() {
             <table className="w-full min-w-[900px]">
               <thead>
                   <tr className="bg-green-50 text-xs text-green-800 font-semibold">
-                    <th className="px-3 py-3 text-center sticky left-0 bg-green-50 w-10">#</th>
+                    <th className="px-3 py-3 text-center sticky left-0 bg-green-50 w-10" title="Nomor urut tabel (bukan No. Absen)">No</th>
                     <th className="px-3 py-3 text-left sticky left-10 bg-green-50 min-w-[160px]">Nama Santri</th>
                     <th className="px-3 py-3 text-center uppercase tracking-wide">Jilid</th>
                   {namaBulan.map((b, i) => (
@@ -424,6 +433,19 @@ export default function DaftarSantriPage() {
               >
                 {detailSantri.status_aktif ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
               </button>
+              {detailSantri.status_aktif && (
+                <button
+                  onClick={() => {
+                    setSelectedSantri(detailSantri);
+                    setStatusAction('luluskan');
+                    setShowDetailModal(false);
+                    setShowDeleteModal(true);
+                  }}
+                  className="flex-1 btn-secondary border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                >
+                  🎓 Luluskan
+                </button>
+              )}
               <Link
                 href={`/admin/santri/tambah?edit=${detailSantri.id}`}
                 className="btn-secondary flex-1 text-center"
@@ -436,14 +458,18 @@ export default function DaftarSantriPage() {
         </div>
       )}
 
-      {/* Delete Modal */}
+      {/* Action Confirm Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Konfirmasi Hapus</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">
+              {statusAction === 'luluskan' ? 'Konfirmasi Kelulusan' : 'Konfirmasi'}
+            </h3>
             <p className="text-gray-600 mb-4">
               {statusAction === 'aktifkan'
                 ? <>Aktifkan kembali santri <strong style={{ color: selectedSantri?.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{selectedSantri?.nama_lengkap}</strong>? Masukkan PIN untuk konfirmasi.</>
+                : statusAction === 'luluskan'
+                ? <>Tandai santri <strong style={{ color: selectedSantri?.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{selectedSantri?.nama_lengkap}</strong> sebagai <strong>LULUS</strong>? Santri akan dipindahkan ke halaman Alumni dan tidak dihitung SPP lagi.</>
                 : <>Nonaktifkan santri <strong style={{ color: selectedSantri?.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{selectedSantri?.nama_lengkap}</strong>? Masukkan PIN untuk konfirmasi.</>
               }
             </p>
@@ -451,9 +477,11 @@ export default function DaftarSantriPage() {
               type="password"
               value={pin}
               onChange={(e) => setPin(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && pin && !deleteLoading) handleStatusChange(); }}
               placeholder="Masukkan PIN"
               className="input-field mb-4"
               maxLength={6}
+              autoFocus
             />
             <div className="flex gap-3">
               <button
@@ -465,9 +493,9 @@ export default function DaftarSantriPage() {
               <button
                 onClick={handleStatusChange}
                 disabled={deleteLoading}
-                className={`${statusAction === 'aktifkan' ? 'btn-primary' : 'btn-danger'} flex-1`}
+                className={`${statusAction === 'aktifkan' ? 'btn-primary' : statusAction === 'luluskan' ? 'btn-primary' : 'btn-danger'} flex-1`}
               >
-                {deleteLoading ? 'Memproses...' : (statusAction === 'aktifkan' ? 'Aktifkan' : 'Nonaktifkan')}
+                {deleteLoading ? 'Memproses...' : (statusAction === 'aktifkan' ? 'Aktifkan' : statusAction === 'luluskan' ? '🎓 Luluskan' : 'Nonaktifkan')}
               </button>
             </div>
           </div>
