@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { Role, Admin } from '@/lib/models';
 import sequelize from '@/lib/db';
-import { createBackup } from '@/lib/utils';
+import { createBackup, isFullAccessRole } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 // PUT - Update role (hanya admin id=1 / Pimpinan TPQ)
@@ -15,9 +15,9 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
     }
 
-    if (auth.user.id !== 1 && auth.user.jabatan !== 'Pimpinan TPQ') {
+    if (!isFullAccessRole(auth.user.jabatan)) {
       return NextResponse.json(
-        { success: false, pesan: 'Hanya Pimpinan TPQ yang dapat mengubah role' },
+        { success: false, pesan: 'Hanya Pimpinan TPQ atau Developer yang dapat mengubah role' },
         { status: 403 }
       );
     }
@@ -84,9 +84,9 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
     }
 
-    if (auth.user.id !== 1 && auth.user.jabatan !== 'Pimpinan TPQ') {
+    if (!isFullAccessRole(auth.user.jabatan)) {
       return NextResponse.json(
-        { success: false, pesan: 'Hanya Pimpinan TPQ yang dapat menghapus role' },
+        { success: false, pesan: 'Hanya Pimpinan TPQ atau Developer yang dapat menghapus role' },
         { status: 403 }
       );
     }

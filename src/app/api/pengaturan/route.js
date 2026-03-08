@@ -40,7 +40,7 @@ export async function PUT(request) {
 
     await sequelize.authenticate();
     const admin = await Admin.findByPk(auth.user.id);
-    if (!admin || !['Pimpinan TPQ', 'Bendahara'].includes(admin.jabatan)) {
+    if (!admin || !['Developer', 'Pimpinan TPQ', 'Bendahara'].includes(admin.jabatan)) {
       return NextResponse.json({ success: false, pesan: 'Anda tidak memiliki akses untuk mengubah pengaturan' }, { status: 403 });
     }
 

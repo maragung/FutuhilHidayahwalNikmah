@@ -16,7 +16,7 @@ import {
 import sequelize from '@/lib/db';
 import crypto from 'crypto';
 
-const ALLOWED = ['Pimpinan TPQ', 'Sekretaris', 'Bendahara'];
+const ALLOWED = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'];
 
 async function fetchAllData() {
   const [

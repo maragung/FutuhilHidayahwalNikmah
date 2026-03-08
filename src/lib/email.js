@@ -218,6 +218,7 @@ async function kirimEmailAksiAdmin({ aksi, deskripsi, detail, adminNama, adminJa
   if (!emailTujuan || emailTujuan.length === 0) return { success: false };
 
   const warna = {
+    'Developer': '#6d28d9',
     'Bendahara': '#2563eb',
     'Sekretaris': '#7c3aed',
     'Pengajar': '#0891b2',
@@ -263,9 +264,9 @@ async function getEmailPenerimaPerubahan(_adminId) {
 
     const emails = new Set(admins.map((a) => a.email).filter(Boolean));
 
-    // Juga tambahkan semua Pimpinan TPQ aktif (selalu mendapat notifikasi)
+    // Juga tambahkan semua Developer & Pimpinan TPQ aktif (selalu mendapat notifikasi)
     const pimpinan = await Admin.findAll({
-      where: { is_active: true, jabatan: 'Pimpinan TPQ' },
+      where: { is_active: true, jabatan: ['Developer', 'Pimpinan TPQ'] },
       attributes: ['email'],
     });
     pimpinan.forEach((a) => { if (a.email) emails.add(a.email); });

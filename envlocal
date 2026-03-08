@@ -1,1 +1,22 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to .env.local and fill in real values.
+# .env.local is gitignored and never committed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Database
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=tpq_futuhil_hidayah
+DB_USER=root
+DB_PASSWORD=
+
+# JWT
+# WAJIB: minimal 32 karakter acak, JANGAN gunakan nilai default ini di production
+# Generate: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+JWT_SECRET=GANTI_INI_dengan_string_acak_minimal_32_karakter_sebelum_deploy
+JWT_EXPIRES_IN=7d
+
+# Dev Audit Tool — set a strong random value, keep it SECRET
+# Access: /dev-audit  →  enter this value as the dev secret
+DEV_SECRET=change_this_to_a_strong_random_secret
 

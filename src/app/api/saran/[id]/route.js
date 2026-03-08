@@ -99,11 +99,11 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    // Cek apakah admin adalah Pimpinan TPQ
+    // Cek apakah admin adalah Pimpinan TPQ atau Developer
     const admin = await Admin.findByPk(auth.user.id);
-    if (!admin || admin.jabatan !== 'Pimpinan TPQ') {
+    if (!admin || !['Pimpinan TPQ', 'Developer'].includes(admin.jabatan)) {
       return NextResponse.json(
-        { success: false, pesan: 'Hanya Pimpinan TPQ yang dapat menghapus saran' },
+        { success: false, pesan: 'Hanya Pimpinan TPQ atau Developer yang dapat menghapus saran' },
         { status: 403 }
       );
     }

@@ -39,7 +39,7 @@ const Role = sequelize.define('Role', {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 99,
-    comment: '1=Pimpinan TPQ, 2=Sekretaris, 3=Bendahara, 4=Pengajar, 5=Lainnya, >5=custom',
+    comment: '0=Developer, 1=Pimpinan TPQ, 2=Sekretaris, 3=Bendahara, 4=Pengajar, 5=Lainnya, >5=custom',
   },
 }, {
   tableName: 'roles',

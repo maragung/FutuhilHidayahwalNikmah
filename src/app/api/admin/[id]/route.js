@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import Admin from '@/lib/models/Admin';
 import sequelize from '@/lib/db';
-import { createBackup } from '@/lib/utils';
+import { createBackup, isFullAccessRole, isSuperAdmin } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 // DELETE - Hapus admin (hanya Pimpinan TPQ)
@@ -18,10 +18,10 @@ export async function DELETE(request, { params }) {
       );
     }
     
-    // Hanya Pimpinan TPQ yang bisa hapus admin
-    if (auth.user.jabatan !== 'Pimpinan TPQ') {
+    // Hanya Developer / Pimpinan TPQ yang bisa hapus admin
+    if (!isFullAccessRole(auth.user.jabatan)) {
       return NextResponse.json(
-        { success: false, pesan: 'Hanya Pimpinan TPQ yang dapat menghapus admin' },
+        { success: false, pesan: 'Hanya Pimpinan TPQ atau Developer yang dapat menghapus admin' },
         { status: 403 }
       );
     }
@@ -106,7 +106,7 @@ export async function PUT(request, { params }) {
     const body = await request.json();
     
     // Admin biasa hanya bisa update diri sendiri
-    if (auth.user.jabatan !== 'Pimpinan TPQ' && parseInt(id) !== auth.user.id) {
+    if (!isFullAccessRole(auth.user.jabatan) && parseInt(id) !== auth.user.id) {
       return NextResponse.json(
         { success: false, pesan: 'Tidak memiliki akses' },
         { status: 403 }
@@ -122,14 +122,26 @@ export async function PUT(request, { params }) {
     }
     
     // Pimpinan TPQ tidak boleh mengubah izin / jabatan Pimpinan TPQ lain
+    // Developer dapat mengubah akun siapapun termasuk Pimpinan TPQ
     if (
       auth.user.jabatan === 'Pimpinan TPQ' &&
       parseInt(id) !== auth.user.id &&
-      admin.jabatan === 'Pimpinan TPQ' &&
+      (admin.jabatan === 'Pimpinan TPQ' || admin.jabatan === 'Developer') &&
       (body.jabatan !== undefined || body.is_active !== undefined || body.akses !== undefined || body.pin !== undefined)
     ) {
       return NextResponse.json(
-        { success: false, pesan: 'Tidak dapat mengubah izin/jabatan sesama Pimpinan TPQ' },
+        { success: false, pesan: 'Tidak dapat mengubah izin/jabatan sesama Pimpinan TPQ atau Developer' },
+        { status: 403 }
+      );
+    }
+
+    // Pimpinan TPQ tidak dapat mengubah akun Developer
+    if (
+      auth.user.jabatan === 'Pimpinan TPQ' &&
+      admin.jabatan === 'Developer'
+    ) {
+      return NextResponse.json(
+        { success: false, pesan: 'Tidak dapat mengubah akun Developer' },
         { status: 403 }
       );
     }
@@ -138,7 +150,7 @@ export async function PUT(request, { params }) {
     
     // Field yang bisa diupdate
     const allowedFields = ['nama_lengkap', 'email', 'username', 'terima_email_perubahan'];
-    if (auth.user.jabatan === 'Pimpinan TPQ') {
+    if (isFullAccessRole(auth.user.jabatan)) {
       allowedFields.push('jabatan', 'is_active', 'akses', 'pin');
     }
     

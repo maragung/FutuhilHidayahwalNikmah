@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { Role, Admin } from '@/lib/models';
 import sequelize from '@/lib/db';
-import { createBackup } from '@/lib/utils';
+import { createBackup, isFullAccessRole } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
-// Roles default sistem (level 1-5 tidak bisa dihapus)
+// Roles default sistem (tidak bisa dihapus)
 export const ROLES_DEFAULT = [
+  { id: 6, nama_role: 'Developer',    level: 0, is_system: true, deskripsi: 'Developer / Super Admin – akses penuh termasuk kelola Pimpinan', akses_default: null },
   { id: 1, nama_role: 'Pimpinan TPQ', level: 1, is_system: true, deskripsi: 'Pimpinan / Kepala TPQ – akses penuh', akses_default: null },
   { id: 2, nama_role: 'Sekretaris',   level: 2, is_system: true, deskripsi: 'Sekretaris – kelola santri & laporan', akses_default: ['dashboard','santri','tambah_santri','bayar','pembayaran_lain','laporan','jurnal','saran','export_database'] },
   { id: 3, nama_role: 'Bendahara',    level: 3, is_system: true, deskripsi: 'Bendahara – kelola keuangan',          akses_default: ['dashboard','santri','bayar','pembayaran_lain','infak','pengeluaran','dana','jurnal','laporan','pengaturan','export_database'] },
@@ -43,9 +44,9 @@ export async function POST(request) {
       return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
     }
 
-    if (auth.user.id !== 1 && auth.user.jabatan !== 'Pimpinan TPQ') {
+    if (!isFullAccessRole(auth.user.jabatan)) {
       return NextResponse.json(
-        { success: false, pesan: 'Hanya Pimpinan TPQ yang dapat menambah role' },
+        { success: false, pesan: 'Hanya Pimpinan TPQ atau Developer yang dapat menambah role' },
         { status: 403 }
       );
     }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import Admin from '@/lib/models/Admin';
 import sequelize from '@/lib/db';
-import { createBackup } from '@/lib/utils';
+import { createBackup, isFullAccessRole } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 // GET - Ambil semua admin
@@ -18,8 +18,8 @@ export async function GET(request) {
       );
     }
     
-    // Hanya Pimpinan TPQ yang bisa lihat daftar admin
-    if (auth.user.jabatan !== 'Pimpinan TPQ') {
+    // Hanya Developer / Pimpinan TPQ yang bisa lihat daftar admin
+    if (!isFullAccessRole(auth.user.jabatan)) {
       return NextResponse.json(
         { success: false, pesan: 'Tidak memiliki akses' },
         { status: 403 }
@@ -57,10 +57,10 @@ export async function POST(request) {
       );
     }
     
-    // Hanya Pimpinan TPQ yang bisa tambah admin
-    if (auth.user.jabatan !== 'Pimpinan TPQ') {
+    // Hanya Developer / Pimpinan TPQ yang bisa tambah admin
+    if (!isFullAccessRole(auth.user.jabatan)) {
       return NextResponse.json(
-        { success: false, pesan: 'Hanya Pimpinan TPQ yang dapat menambah admin' },
+        { success: false, pesan: 'Hanya Pimpinan TPQ atau Developer yang dapat menambah admin' },
         { status: 403 }
       );
     }
