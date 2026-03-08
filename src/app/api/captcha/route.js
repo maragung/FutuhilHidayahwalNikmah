@@ -3,7 +3,7 @@ import { buildCaptchaSvg, createCaptchaToken, generateCaptchaCode } from '@/lib/
 
 export async function GET() {
   try {
-    const code = generateCaptchaCode(6);
+    const code = generateCaptchaCode();
     const token = createCaptchaToken(code);
     const svg = buildCaptchaSvg(code);
     const image = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;

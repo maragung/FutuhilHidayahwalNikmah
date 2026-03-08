@@ -12,7 +12,7 @@ function getCaptchaSecret() {
   return DEV_FALLBACK_JWT_SECRET;
 }
 
-export function generateCaptchaCode(length = 6) {
+export function generateCaptchaCode(length = 3) {
   let code = '';
   for (let i = 0; i < length; i++) {
     code += CAPTCHA_CHARS[Math.floor(Math.random() * CAPTCHA_CHARS.length)];
@@ -50,7 +50,7 @@ export function verifyCaptchaPayload(token, answer) {
 }
 
 export function buildCaptchaSvg(code) {
-  const w = 220;
+  const w = 160;
   const h = 70;
   const chars = String(code || '').split('');
 
@@ -69,7 +69,7 @@ export function buildCaptchaSvg(code) {
   }).join('');
 
   const text = chars.map((ch, i) => {
-    const x = 24 + i * 31;
+    const x = 26 + i * 38;
     const y = 46 + ((i % 2) * 4 - 2);
     const rot = (i % 2 === 0 ? -10 : 11);
     return `<text x="${x}" y="${y}" font-size="34" font-family="monospace" font-weight="700" fill="#0f172a" transform="rotate(${rot} ${x} ${y})">${ch}</text>`;

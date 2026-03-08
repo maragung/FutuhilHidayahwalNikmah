@@ -24,7 +24,7 @@ const Admin = sequelize.define('Admin', {
       model: 'roles',
       key: 'id',
     },
-    comment: '1=Pimpinan TPQ, 2=Sekretaris, 3=Bendahara, 4=Pengajar, 5=Lainnya',
+    comment: '0/6=Developer, 1=Pimpinan TPQ, 2=Sekretaris, 3=Bendahara, 4=Pengajar, 5=Lainnya',
   },
   email: {
     type: DataTypes.STRING(100),

@@ -1,5 +1,25 @@
 import Backup from './models/Backup';
 
+// ── Role helpers ──────────────────────────────────────────────────────────────
+/** Roles that enjoy full TPQ management access (Developer + Pimpinan TPQ). */
+export const FULL_ACCESS_ROLES = ['Developer', 'Pimpinan TPQ'];
+
+/**
+ * Returns true for roles with full TPQ management access.
+ * Both 'Developer' and 'Pimpinan TPQ' qualify.
+ */
+export function isFullAccessRole(jabatan) {
+  return FULL_ACCESS_ROLES.includes(jabatan);
+}
+
+/**
+ * Returns true only for the Developer super-admin role.
+ * Developer can also manage Pimpinan TPQ accounts (unlike Pimpinan TPQ).
+ */
+export function isSuperAdmin(jabatan) {
+  return jabatan === 'Developer';
+}
+
 export async function createBackup(aksi, tabel, dataSebelum, dataSesudah, adminId) {
   try {
     await Backup.create({

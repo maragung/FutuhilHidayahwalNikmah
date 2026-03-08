@@ -12,7 +12,7 @@ export default function ExportDatabasePage() {
     try { return JSON.parse(localStorage.getItem('admin_data') || 'null'); } catch { return null; }
   }, []);
 
-  const allowed = ['Pimpinan TPQ', 'Sekretaris', 'Bendahara'].includes(user?.jabatan);
+  const allowed = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'].includes(user?.jabatan);
 
   const handleExport = async () => {
     setError('');

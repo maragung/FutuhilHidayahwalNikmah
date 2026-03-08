@@ -20,6 +20,7 @@ const {
 } = require('./models');
 
 const ROLES_DEFAULT = [
+  { id: 6, nama_role: 'Developer',    level: 0, is_system: true, deskripsi: 'Developer / Super Admin – akses penuh termasuk kelola Pimpinan' },
   { id: 1, nama_role: 'Pimpinan TPQ', level: 1, is_system: true, deskripsi: 'Pimpinan / Kepala TPQ – akses penuh' },
   { id: 2, nama_role: 'Sekretaris',   level: 2, is_system: true, deskripsi: 'Sekretaris – kelola santri & laporan' },
   { id: 3, nama_role: 'Bendahara',    level: 3, is_system: true, deskripsi: 'Bendahara – kelola keuangan' },
@@ -60,8 +61,8 @@ async function seed() {
 
     const admin = await Admin.create({
       nama_lengkap: 'Developer',
-      jabatan: 'Pimpinan TPQ',
-      role_id: 1,
+      jabatan: 'Developer',
+      role_id: 6,
       username: 'developer',
       email: 'gmaragung@gmail.com',
       password: 'admin123456789',
@@ -71,11 +72,11 @@ async function seed() {
 
     await t.commit();
 
-    console.log('✅ Seed selesai: semua tabel dikosongkan');
-    console.log('✅ Roles dibuat: Pimpinan TPQ, Sekretaris, Bendahara, Pengajar, Lainnya');
+    console.log('✅ Seed selesai: Developer, Pimpinan TPQ, Sekretaris, Bendahara, Pengajar, Lainnya');
     console.log('✅ Admin dibuat:');
     console.log(`   ID       : ${admin.id}`);
     console.log('   Username : developer');
+    console.log('   Jabatan  : Developer (Super Admin)');
     console.log('   Email    : gmaragung@gmail.com');
     console.log('   Password : admin123456789');
     console.log('   PIN      : 123456  (per-akun — ubah via halaman Akun setelah login)');

@@ -121,6 +121,7 @@ export default function ManageAdminPage() {
   const [success, setSuccess] = useState('');
 
   const jabatanList = ['Pengajar', 'Sekretaris', 'Bendahara', 'Pimpinan TPQ', 'Lainnya'];
+  // Developer role is not assignable via UI — it's a system-level super-admin
   
   const menuAkses = [
     { key: 'dashboard', label: 'Dashboard' },
@@ -346,15 +347,15 @@ export default function ManageAdminPage() {
     finally { setLoading(false); }
   };
 
-  // Only Pimpinan TPQ can manage admins
-  if (currentUser && currentUser.jabatan !== 'Pimpinan TPQ') {
+  // Only Developer / Pimpinan TPQ can manage admins
+  if (currentUser && currentUser.jabatan !== 'Pimpinan TPQ' && currentUser.jabatan !== 'Developer') {
     return (
       <div className="text-center py-12">
         <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
         <h2 className="text-xl font-semibold text-gray-700">Akses Terbatas</h2>
-        <p className="text-gray-500 mt-2">Hanya Pimpinan TPQ yang dapat mengelola data admin</p>
+        <p className="text-gray-500 mt-2">Hanya Pimpinan TPQ atau Developer yang dapat mengelola data admin</p>
       </div>
     );
   }
@@ -582,7 +583,8 @@ export default function ManageAdminPage() {
                       <div className="flex items-center justify-end gap-1">
                         {admin.id !== currentUser?.id && (
                           <>
-                            {admin.jabatan !== 'Pimpinan TPQ' && (
+                            {/* Developer can manage Pimpinan TPQ accounts; Pimpinan TPQ only manages non-Pimpinan */}
+                            {(admin.jabatan !== 'Pimpinan TPQ' && admin.jabatan !== 'Developer') || currentUser?.jabatan === 'Developer' ? (
                               <button
                                 onClick={() => openAccessEditor(admin)}
                                 className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
@@ -592,7 +594,7 @@ export default function ManageAdminPage() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                                 </svg>
                               </button>
-                            )}
+                            ) : null}
                             <button
                               onClick={() => setResetPassword({ show: true, admin, password: '', konfirmasi: '', pin: '' })}
                               className="p-1.5 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors"

@@ -27,33 +27,49 @@ async function migrate() {
     console.log('✅ Semua tabel berhasil dibuat/diupdate!');
     console.log('   • Kolom no_absen tersedia di tabel santri (nullable, integer)');
 
-    // Seed roles default
+    // Seed roles default — ensure Developer role exists even on existing installs
     const roleCount = await Role.count();
     if (roleCount === 0) {
       for (const role of ROLES_DEFAULT) {
         await Role.create(role);
       }
-      console.log('✅ Role default berhasil dibuat!');
+      console.log('✅ Role default berhasil dibuat (termasuk Developer)!');
+    } else {
+      // Ensure Developer role exists (for existing installs)
+      const devRole = await Role.findOne({ where: { nama_role: 'Developer' } });
+      if (!devRole) {
+        await Role.create({ id: 6, nama_role: 'Developer', level: 0, is_system: true, deskripsi: 'Developer / Super Admin – akses penuh termasuk kelola Pimpinan', akses_default: null });
+        console.log('✅ Role Developer berhasil ditambahkan!');
+      }
     }
 
     // Cek apakah admin sudah ada
     const adminCount = await Admin.count();
     if (adminCount === 0) {
-      // Buat admin default
+      // Buat admin default dengan role Developer
+      const devRole = await Role.findOne({ where: { nama_role: 'Developer' } });
       await Admin.create({
         nama_lengkap: 'Developer',
-        jabatan: 'Pimpinan TPQ',
-        role_id: 1,
+        jabatan: 'Developer',
+        role_id: devRole ? devRole.id : 6,
         username: 'developer',
         email: 'maragung@outlook.com',
         password: 'admin123456789',
         pin: '123456',
       });
-      console.log('✅ Admin default berhasil dibuat!');
+      console.log('✅ Admin default berhasil dibuat (jabatan: Developer)!');
       console.log('   Email: maragung@outlook.com');
       console.log('   Password: admin123456789');
       console.log('   PIN: 123456  (per-akun — ubah via halaman Akun setelah login)');
     } else {
+      // Migrasi: ubah jabatan akun developer dari Pimpinan TPQ menjadi Developer
+      const devAdmin = await Admin.findOne({ where: { username: 'developer' } });
+      if (devAdmin && devAdmin.jabatan === 'Pimpinan TPQ') {
+        const devRole = await Role.findOne({ where: { nama_role: 'Developer' } });
+        await devAdmin.update({ jabatan: 'Developer', role_id: devRole ? devRole.id : 6 });
+        console.log('✅ Jabatan akun developer dimigrasi: Pimpinan TPQ → Developer');
+      }
+
       const pimpinan = await Admin.findOne({ where: { jabatan: 'Pimpinan TPQ' } });
       if (pimpinan && !pimpinan.username) {
         await pimpinan.update({ username: 'pimpinan' });
