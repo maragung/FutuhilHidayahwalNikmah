@@ -37,6 +37,7 @@ DB_NAME=tpq_futuhil_hidayah
 DB_USER=root
 DB_PASSWORD=
 DB_SSL=false
+DEV_SECRET=change_this_to_a_strong_random_secret
 
 JWT_SECRET=ganti_dengan_secret_panjang_acak
 JWT_EXPIRES_IN=7d
