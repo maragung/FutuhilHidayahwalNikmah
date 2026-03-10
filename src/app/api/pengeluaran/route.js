@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Pengeluaran, Admin, JurnalKas } from '@/lib/models';
+import { Pengeluaran, Admin, JurnalKas, Log } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 import { createBackup, generateKodeInvoice } from '@/lib/utils';
@@ -140,6 +140,16 @@ export async function POST(request) {
     
     // Backup
     await createBackup('Tambah Pengeluaran', 'pengeluaran', null, pengeluaran.toJSON(), auth.user.id);
+
+    // Audit log
+    try {
+      await Log.create({
+        level: 'INFO',
+        context: 'PENGELUARAN',
+        message: `[${auth.user.username}] Catat pengeluaran: ${judul}`,
+        detail: JSON.stringify({ judul, nominal, kategori, catatan }),
+      });
+    } catch (_) {}
     
     // Kirim salinan email ke Pimpinan TPQ & Bendahara
     try {

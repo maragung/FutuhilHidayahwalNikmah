@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { PembayaranSPP, Santri, Admin, JurnalKas, Pengaturan } from '@/lib/models';
+import { PembayaranSPP, Santri, Admin, JurnalKas, Pengaturan, Log } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 import { createBackup, generateKodeInvoice } from '@/lib/utils';
@@ -300,6 +300,16 @@ export async function POST(request) {
     
     // Backup
     await createBackup('Tambah Pembayaran SPP', 'pembayaran_spp', null, pembayaranList, auth.user.id);
+
+    // Audit log
+    try {
+      await Log.create({
+        level: 'INFO',
+        context: 'PEMBAYARAN_SPP',
+        message: `[${auth.user.username}] Tambah pembayaran SPP ${bulanList.length} bulan untuk santri ${santri.nik}`,
+        detail: JSON.stringify({ santri_id, bulan: bulanList, tahun: tahunInt, nominal: nominalPerBulan, metode: metode_bayar }),
+      });
+    } catch (_) {}
     
     // Kirim salinan email ke Pimpinan TPQ & Bendahara
     try {

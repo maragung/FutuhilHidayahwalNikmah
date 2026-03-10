@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { InfakSedekah, Admin, JurnalKas } from '@/lib/models';
+import { InfakSedekah, Admin, JurnalKas, Log } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 import { createBackup, generateKodeInvoice } from '@/lib/utils';
@@ -134,6 +134,16 @@ export async function POST(request) {
     
     // Backup
     await createBackup('Tambah Infak/Sedekah', 'infak_sedekah', null, infak.toJSON(), auth.user.id);
+
+    // Audit log
+    try {
+      await Log.create({
+        level: 'INFO',
+        context: 'INFAK_SEDEKAH',
+        message: `[${auth.user.username}] Catat infak/sedekah dari ${nama_donatur}`,
+        detail: JSON.stringify({ nama_donatur, nominal, catatan }),
+      });
+    } catch (_) {}
     
     // Kirim salinan email ke Pimpinan TPQ & Bendahara
     try {
