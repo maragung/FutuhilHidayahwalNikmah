@@ -5,14 +5,22 @@ import Link from 'next/link';
 import { safeHexColor } from '@/lib/color';
 import { SkeletonTable } from '@/components/SkeletonLoader';
 
+const SORT_OPTIONS = [
+  { value: 'nama', label: 'Nama' },
+  { value: 'no_absen', label: 'No. Absen' },
+  { value: 'tgl_mendaftar', label: 'Waktu Terdaftar' },
+];
+
 export default function DaftarSantriPage() {
   const [loading, setLoading] = useState(true);
   const [santriList, setSantriList] = useState([]);
   const [statusPembayaran, setStatusPembayaran] = useState([]);
   const [search, setSearch] = useState('');
   const [tahun, setTahun] = useState(new Date().getFullYear());
-  const [filterKategori, setFilterKategori] = useState('semua'); // semua|subsidi|non_subsidi|jilid|lunas
-  const [filterJilid, setFilterJilid] = useState('');
+  const [selectedKategori, setSelectedKategori] = useState([]); // subsidi|non_subsidi|lunas|laki_laki|perempuan
+  const [selectedJilid, setSelectedJilid] = useState([]);
+  const [sortBy, setSortBy] = useState('nama');
+  const [sortDir, setSortDir] = useState('asc');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailSantri, setDetailSantri] = useState(null);
@@ -89,6 +97,50 @@ export default function DaftarSantriPage() {
     return years;
   };
 
+  const toggleKategori = (key) => {
+    setSelectedKategori((prev) => prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]);
+  };
+
+  const toggleJilid = (jilid) => {
+    setSelectedJilid((prev) => prev.includes(jilid) ? prev.filter((item) => item !== jilid) : [...prev, jilid]);
+  };
+
+  const resetFilter = () => {
+    setSelectedKategori([]);
+    setSelectedJilid([]);
+    setSortBy('nama');
+    setSortDir('asc');
+  };
+
+  const isLunas = (santri) => {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    const batas = tahun === currentYear ? currentMonth : 12;
+    for (let b = 1; b <= batas; b++) {
+      const st = santri.bulan_status?.[b];
+      if (st?.wajib && !st?.dibayar) return false;
+    }
+    return santri.bulan_wajib > 0;
+  };
+
+  const sortData = (data) => {
+    const sorted = [...data].sort((a, b) => {
+      if (sortBy === 'no_absen') {
+        const aNo = a.no_absen ?? Number.MAX_SAFE_INTEGER;
+        const bNo = b.no_absen ?? Number.MAX_SAFE_INTEGER;
+        return aNo - bNo;
+      }
+      if (sortBy === 'tgl_mendaftar') {
+        const aDate = a.tgl_mendaftar ? new Date(a.tgl_mendaftar).getTime() : 0;
+        const bDate = b.tgl_mendaftar ? new Date(b.tgl_mendaftar).getTime() : 0;
+        return aDate - bDate;
+      }
+      return String(a.nama_lengkap || '').localeCompare(String(b.nama_lengkap || ''), 'id', { sensitivity: 'base', numeric: true });
+    });
+
+    return sortDir === 'desc' ? sorted.reverse() : sorted;
+  };
+
   const handleStatusChange = async () => {
     if (!pin) {
       setError('Masukkan PIN');
@@ -144,26 +196,34 @@ export default function DaftarSantriPage() {
   };
 
   const filteredData = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1;
-    return statusPembayaran.filter(s => {
-      if (search && !s.nama_lengkap.toLowerCase().includes(search.toLowerCase()) && !s.nik.includes(search)) return false;
-      switch (filterKategori) {
-        case 'subsidi':     return s.is_subsidi;
-        case 'non_subsidi': return !s.is_subsidi;
-        case 'jilid':       return filterJilid ? s.jilid === filterJilid : true;
-        case 'lunas': {
-          const batas = tahun === currentYear ? currentMonth : 12;
-          for (let b = 1; b <= batas; b++) {
-            const st = s.bulan_status[b];
-            if (st?.wajib && !st?.dibayar) return false;
-          }
-          return s.bulan_wajib > 0; // exclude santri who have no required months
-        }
-        default: return true;
+    return sortData(statusPembayaran.filter(s => {
+      if (search) {
+        const query = search.toLowerCase();
+        const cocok =
+          s.nama_lengkap.toLowerCase().includes(query) ||
+          s.nik.includes(search) ||
+          String(s.no_absen || '').includes(search) ||
+          String(s.jenis_kelamin || '').toLowerCase().includes(query);
+        if (!cocok) return false;
       }
-    });
-  }, [statusPembayaran, search, filterKategori, filterJilid, tahun]);
+
+      const subsidiFilter = selectedKategori.filter((key) => key === 'subsidi' || key === 'non_subsidi');
+      if (subsidiFilter.length === 1) {
+        if (subsidiFilter[0] === 'subsidi' && !s.is_subsidi) return false;
+        if (subsidiFilter[0] === 'non_subsidi' && s.is_subsidi) return false;
+      }
+
+      const genderFilter = selectedKategori.filter((key) => key === 'laki_laki' || key === 'perempuan');
+      if (genderFilter.length === 1) {
+        if (genderFilter[0] === 'laki_laki' && s.jenis_kelamin !== 'Laki-laki') return false;
+        if (genderFilter[0] === 'perempuan' && s.jenis_kelamin !== 'Perempuan') return false;
+      }
+
+      if (selectedKategori.includes('lunas') && !isLunas(s)) return false;
+      if (selectedJilid.length > 0 && !selectedJilid.includes(s.jilid)) return false;
+      return true;
+    }));
+  }, [statusPembayaran, search, selectedKategori, selectedJilid, tahun, sortBy, sortDir]);
 
   const jilidList = useMemo(() => {
     const set = new Set(statusPembayaran.map(s => s.jilid).filter(Boolean));
@@ -223,45 +283,82 @@ export default function DaftarSantriPage() {
             </select>
           </div>
         </div>
-        {/* Category filter chips */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {[
-            { key: 'semua',      label: 'Semua' },
-            { key: 'subsidi',    label: 'Subsidi' },
-            { key: 'non_subsidi',label: 'Non Subsidi' },
-            { key: 'jilid',      label: 'Jilid' },
-            { key: 'lunas',      label: '✓ Lunas' },
-          ].map(chip => (
-            <button
-              key={chip.key}
-              onClick={() => { setFilterKategori(chip.key); if (chip.key !== 'jilid') setFilterJilid(''); }}
-              className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
-                filterKategori === chip.key
-                  ? 'bg-green-600 text-white border-green-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
-              }`}
-            >
-              {chip.label}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            {[
+              { key: 'subsidi', label: 'Subsidi' },
+              { key: 'non_subsidi', label: 'Non Subsidi' },
+              { key: 'lunas', label: '✓ Lunas' },
+              { key: 'laki_laki', label: 'Laki-laki' },
+              { key: 'perempuan', label: 'Perempuan' },
+            ].map((chip) => {
+              const active = selectedKategori.includes(chip.key);
+              return (
+                <button
+                  key={chip.key}
+                  onClick={() => toggleKategori(chip.key)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
+                    active
+                      ? 'bg-green-600 text-white border-green-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+            <button onClick={resetFilter} className="px-3 py-1 rounded-full text-sm font-medium border bg-white text-gray-500 border-gray-300 hover:border-red-300 hover:text-red-600">
+              Reset
             </button>
-          ))}
-          {filterKategori === 'jilid' && jilidList.length > 0 && (
-            <select
-              value={filterJilid}
-              onChange={(e) => setFilterJilid(e.target.value)}
-              className="input-field py-1 text-sm"
-            >
-              <option value="">Semua Jilid</option>
-              {jilidList.map(j => <option key={j} value={j}>{j}</option>)}
-            </select>
+            <span className="ml-auto text-xs text-gray-500">{filteredData.length} santri</span>
+          </div>
+
+          {jilidList.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter Jilid (multi select)</p>
+              <div className="flex flex-wrap gap-2">
+                {jilidList.map((j) => {
+                  const active = selectedJilid.includes(j);
+                  return (
+                    <button
+                      key={j}
+                      onClick={() => toggleJilid(j)}
+                      className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
+                        active
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                      }`}
+                    >
+                      {j}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
-          <span className="ml-auto text-xs text-gray-500">{filteredData.length} santri</span>
+
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+            <div className="sm:w-52">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Sortir</label>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="input-field py-2 text-sm">
+                {SORT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              </select>
+            </div>
+            <div className="sm:w-44">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Arah</label>
+              <select value={sortDir} onChange={(e) => setSortDir(e.target.value)} className="input-field py-2 text-sm">
+                <option value="asc">Naik</option>
+                <option value="desc">Turun</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Table */}
       <div className="card p-0">
         {loading ? (
-          <SkeletonTable rows={8} cols={16} />
+          <SkeletonTable rows={8} cols={17} />
         ) : (
           <div className="table-container">
             <table className="w-full min-w-[900px]">
@@ -273,13 +370,14 @@ export default function DaftarSantriPage() {
                   {namaBulan.map((b, i) => (
                     <th key={i} className="px-2 py-3 text-center">{b}</th>
                   ))}
+                  <th className="px-3 py-3 text-center">Dibayar</th>
                   <th className="px-3 py-3 text-center">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={16} className="text-center py-8 text-gray-500">
+                    <td colSpan={17} className="text-center py-8 text-gray-500">
                       Tidak ada data santri
                     </td>
                   </tr>
@@ -297,9 +395,16 @@ export default function DaftarSantriPage() {
                         <td className="table-cell sticky left-10 bg-white min-w-[160px]">
                         <div>
                           <p className="font-medium" style={{ color: santri.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{santri.nama_lengkap}</p>
-                          <p className="text-xs" style={{ color: santri.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>
-                            {santri.is_subsidi ? 'Subsidi' : 'Non Subsidi'}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                            <span className="text-xs" style={{ color: santri.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>
+                              {santri.is_subsidi ? 'Subsidi' : 'Non Subsidi'}
+                            </span>
+                            {santri.jenis_kelamin && (
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+                                {santri.jenis_kelamin}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500">{santri.nik}</p>
                           <p className={`text-xs ${santri.status_aktif ? 'text-green-600' : 'text-red-600'}`}>{santri.status_aktif ? 'Aktif' : 'Nonaktif'}</p>
                         </div>
@@ -322,6 +427,11 @@ export default function DaftarSantriPage() {
                           </td>
                         );
                       })}
+                      <td className="table-cell text-center">
+                        <span className="badge badge-info">
+                          {santri.bulan_dibayar_total || 0} bln
+                        </span>
+                      </td>
                       <td className="table-cell text-center">
                         <span className={`badge ${santri.bulan_wajib > 0 && santri.bulan_terbayar >= santri.bulan_wajib ? 'badge-success' : santri.bulan_terbayar >= 6 ? 'badge-warning' : 'badge-danger'}`}>
                           {santri.bulan_terbayar}/{santri.bulan_wajib}
@@ -354,7 +464,7 @@ export default function DaftarSantriPage() {
                 <p className="font-bold text-gray-800 text-lg" style={{ color: detailSantri.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>
                   {detailSantri.nama_lengkap}
                 </p>
-                <p className="text-sm text-gray-500">{detailSantri.is_subsidi ? 'Subsidi' : 'Non Subsidi'} • {detailSantri.jilid}</p>
+                <p className="text-sm text-gray-500">{detailSantri.is_subsidi ? 'Subsidi' : 'Non Subsidi'} • {detailSantri.jilid}{detailSantri.jenis_kelamin ? ` • ${detailSantri.jenis_kelamin}` : ''}</p>
               </div>
             </div>
 
@@ -376,8 +486,16 @@ export default function DaftarSantriPage() {
                 </p>
               </div>
               <div className="bg-gray-50 rounded p-3">
+                <p className="text-xs text-gray-500">Jenis Kelamin</p>
+                <p className="font-medium">{detailSantri.jenis_kelamin || '-'}</p>
+              </div>
+              <div className="bg-gray-50 rounded p-3">
                 <p className="text-xs text-gray-500">Tgl Mendaftar</p>
                 <p className="font-medium">{new Date(detailSantri.tgl_mendaftar).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+              </div>
+              <div className="bg-gray-50 rounded p-3">
+                <p className="text-xs text-gray-500">Dibayar Total</p>
+                <p className="font-medium">{detailSantri.bulan_dibayar_total || 0} bulan</p>
               </div>
               <div className="bg-gray-50 rounded p-3">
                 <p className="text-xs text-gray-500">Pembayaran {tahun}</p>

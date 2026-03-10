@@ -7,6 +7,7 @@ import { createBackup } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 const ROLE_BISA_KELOLA_SANTRI = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
+const JENIS_KELAMIN_OPTIONS = ['Laki-laki', 'Perempuan'];
 // GET - Ambil semua santri (auth required)
 export async function GET(request) {
   try {
@@ -33,6 +34,7 @@ export async function GET(request) {
       where[Op.or] = [
         { nama_lengkap: { [Op.like]: `%${safeSearch}%` } },
         { nik: { [Op.like]: `%${safeSearch}%` } },
+        { jenis_kelamin: { [Op.like]: `%${safeSearch}%` } },
       ];
     }
     
@@ -96,7 +98,7 @@ export async function POST(request) {
     }
     
     const body = await request.json();
-    const { nik, nama_lengkap, jilid, alamat, nama_wali, no_telp_wali, email_wali, tgl_mendaftar, pin, is_subsidi, no_absen } = body;
+    const { nik, nama_lengkap, jenis_kelamin, jilid, alamat, nama_wali, no_telp_wali, email_wali, tgl_mendaftar, pin, is_subsidi, no_absen } = body;
     
     // PIN verification
     const admin = await Admin.findByPk(auth.user.id);
@@ -116,6 +118,13 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+
+    if (!jenis_kelamin || !JENIS_KELAMIN_OPTIONS.includes(jenis_kelamin)) {
+      return NextResponse.json(
+        { success: false, pesan: 'Jenis kelamin wajib dipilih' },
+        { status: 400 }
+      );
+    }
     
     // Cek NIK sudah ada
     const existing = await Santri.findOne({ where: { nik } });
@@ -130,6 +139,7 @@ export async function POST(request) {
       no_absen: no_absen ? parseInt(no_absen) : null,
       nik,
       nama_lengkap,
+      jenis_kelamin,
       jilid: jilid || 'Jilid 1',
       alamat: alamat || null,
       nama_wali: nama_wali || null,
@@ -152,6 +162,7 @@ export async function POST(request) {
         detail: `<table style="width:100%;border-collapse:collapse;margin-top:10px;">
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>NIK</strong></td><td style="padding:5px;border:1px solid #ddd;">${nik}</td></tr>
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Nama</strong></td><td style="padding:5px;border:1px solid #ddd;">${nama_lengkap}</td></tr>
+          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Jenis Kelamin</strong></td><td style="padding:5px;border:1px solid #ddd;">${jenis_kelamin}</td></tr>
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Jilid</strong></td><td style="padding:5px;border:1px solid #ddd;">${jilid || 'Jilid 1'}</td></tr>
           ${no_absen ? `<tr><td style="padding:5px;border:1px solid #ddd;"><strong>No. Absen</strong></td><td style="padding:5px;border:1px solid #ddd;">${no_absen}</td></tr>` : ''}
         </table>`,

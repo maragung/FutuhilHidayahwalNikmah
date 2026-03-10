@@ -21,6 +21,11 @@ const Santri = sequelize.define('Santri', {
     type: DataTypes.STRING(100),
     allowNull: false,
   },
+  jenis_kelamin: {
+    type: DataTypes.ENUM('Laki-laki', 'Perempuan'),
+    allowNull: true,
+    comment: 'Jenis kelamin santri',
+  },
   jilid: {
     type: DataTypes.STRING(20),
     allowNull: false,
