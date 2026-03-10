@@ -8,6 +8,10 @@ function getMonthIndex(year, month) {
   return (year * 12) + month;
 }
 
+function getElapsedMonthsInclusive(startYear, startMonth, endYear, endMonth) {
+  return ((endYear - startYear) * 12) + (endMonth - startMonth) + 1;
+}
+
 // GET - Status pembayaran santri per tahun
 export async function GET(request) {
   try {
@@ -88,6 +92,7 @@ export async function GET(request) {
       let bulanTerbayar = 0;
       let bulanWajib = 0;
       let bulanDibayarTotal = 0;
+      let bulanSejakDaftarSampaiKini = 0;
 
       // Parse tgl_mendaftar secara UTC agar tidak terpengaruh timezone server.
       // new Date('2024-07-15') selalu UTC midnight → getUTCMonth() = 6 (Juli)
@@ -128,22 +133,18 @@ export async function GET(request) {
       let startMonthIndex = Number.MIN_SAFE_INTEGER;
       if (tahunDaftar !== null && bulanDaftar !== null) {
         startMonthIndex = getMonthIndex(tahunDaftar, bulanDaftar);
-      }
-
-      let endMonthIndex = currentMonthIndex;
-      if (santri.tgl_nonaktif) {
-        const tglNonaktif = new Date(santri.tgl_nonaktif);
-        if (!isNaN(tglNonaktif.getTime())) {
-          const nonaktifYear = tglNonaktif.getUTCFullYear();
-          const nonaktifMonth = tglNonaktif.getUTCMonth() + 1;
-          endMonthIndex = Math.min(endMonthIndex, getMonthIndex(nonaktifYear, nonaktifMonth) - 1);
-        }
+        bulanSejakDaftarSampaiKini = getElapsedMonthsInclusive(
+          tahunDaftar,
+          bulanDaftar,
+          currentYear,
+          currentMonth,
+        );
       }
 
       const totalPaidMonths = paymentTotalMap[santri.id] || [];
       bulanDibayarTotal = totalPaidMonths.filter((item) => {
         const monthIndex = getMonthIndex(item.tahun, item.bulan);
-        return monthIndex >= startMonthIndex && monthIndex <= endMonthIndex;
+        return monthIndex >= startMonthIndex;
       }).length;
 
       const keluargaKey = `${santri.nama_wali || ''}::${santri.no_telp_wali || ''}`;
@@ -187,6 +188,7 @@ export async function GET(request) {
         bulan_status: bulanStatus,
         total_bayar: totalBayar,
         bulan_dibayar_total: bulanDibayarTotal,
+        bulan_sejak_daftar_sampai_kini: bulanSejakDaftarSampaiKini,
         bulan_terbayar: bulanTerbayar,
         bulan_wajib: bulanWajib,
         bulan_belum_bayar: Math.max(bulanWajib - bulanTerbayar, 0),

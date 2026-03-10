@@ -429,7 +429,7 @@ export default function DaftarSantriPage() {
                       })}
                       <td className="table-cell text-center">
                         <span className="badge badge-info">
-                          {santri.bulan_dibayar_total || 0} bln
+                          {(santri.bulan_dibayar_total || 0)}/{(santri.bulan_sejak_daftar_sampai_kini || 0)}
                         </span>
                       </td>
                       <td className="table-cell text-center">
@@ -495,7 +495,7 @@ export default function DaftarSantriPage() {
               </div>
               <div className="bg-gray-50 rounded p-3">
                 <p className="text-xs text-gray-500">Dibayar Total</p>
-                <p className="font-medium">{detailSantri.bulan_dibayar_total || 0} bulan</p>
+                <p className="font-medium">{detailSantri.bulan_dibayar_total || 0}/{detailSantri.bulan_sejak_daftar_sampai_kini || 0} bulan</p>
               </div>
               <div className="bg-gray-50 rounded p-3">
                 <p className="text-xs text-gray-500">Pembayaran {tahun}</p>
