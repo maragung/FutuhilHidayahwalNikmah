@@ -18,6 +18,7 @@ function SantriForm() {
   const [error, setError] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
 
   const [formData, setFormData] = useState({
     no_absen: '',
@@ -32,6 +33,12 @@ function SantriForm() {
     tgl_mendaftar: new Date().toISOString().split('T')[0],
     is_subsidi: false,
   });
+
+  useEffect(() => {
+    try {
+      setCurrentUser(JSON.parse(localStorage.getItem('admin_data') || 'null'));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -70,6 +77,23 @@ function SantriForm() {
   const handleFormSubmit = (e) => {
     e.preventDefault();
     setError('');
+    const isPengajarEditOnly = currentUser?.jabatan === 'Pengajar' && isEdit;
+
+    if (currentUser?.jabatan === 'Pengajar' && !isEdit) {
+      setError('Pengajar tidak memiliki akses untuk menambah santri baru');
+      return;
+    }
+
+    if (isPengajarEditOnly) {
+      if (!formData.jilid) {
+        setError('Jilid wajib dipilih');
+        return;
+      }
+      setShowPinModal(true);
+      setPin('');
+      return;
+    }
+
     if (!isEdit && (!formData.nik || formData.nik.length !== 16)) {
       setError('NIK harus 16 digit');
       return;
@@ -91,11 +115,12 @@ function SantriForm() {
     setLoading(true);
     setError('');
     const token = localStorage.getItem('auth_token');
+    const isPengajarEditOnly = currentUser?.jabatan === 'Pengajar' && isEdit;
     try {
       const res = await fetch(isEdit ? `/api/santri/${editId}` : '/api/santri', {
         method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...formData, pin }),
+        body: JSON.stringify(isPengajarEditOnly ? { jilid: formData.jilid, pin } : { ...formData, pin }),
       });
       const data = await res.json();
       if (data.success) {
@@ -122,6 +147,29 @@ function SantriForm() {
     );
   }
 
+  if (currentUser?.jabatan === 'Pengajar' && !isEdit) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Link href="/admin/santri" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Akses Terbatas</h1>
+            <p className="text-gray-500 text-sm">Pengajar hanya dapat mengubah jilid santri yang sudah terdaftar.</p>
+          </div>
+        </div>
+        <div className="card max-w-xl">
+          <p className="text-sm text-gray-600">Silakan buka data santri, lalu pilih santri yang ingin diperbarui jilidnya.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isPengajarEditOnly = currentUser?.jabatan === 'Pengajar' && isEdit;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -146,6 +194,12 @@ function SantriForm() {
         </div>
       )}
 
+      {isPengajarEditOnly && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+          Mode Pengajar: hanya kolom <strong>Jilid / Kelas</strong> yang dapat diubah.
+        </div>
+      )}
+
       <div className="card max-w-2xl">
         <form onSubmit={handleFormSubmit} className="space-y-5">
 
@@ -164,6 +218,7 @@ function SantriForm() {
                   placeholder="mis. 12"
                   min={1}
                   max={999}
+                  disabled={isPengajarEditOnly}
                 />
               </div>
               <div className="md:col-span-2">
@@ -180,7 +235,7 @@ function SantriForm() {
                   placeholder="16 digit NIK"
                   maxLength={16}
                   pattern="[0-9]{16}"
-                  disabled={isEdit}
+                  disabled={isEdit || isPengajarEditOnly}
                   required={!isEdit}
                 />
               </div>
@@ -199,6 +254,7 @@ function SantriForm() {
               className="input-field"
               placeholder="Nama lengkap santri"
               required
+              disabled={isPengajarEditOnly}
             />
           </div>
 
@@ -207,7 +263,7 @@ function SantriForm() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Jenis Kelamin <span className="text-red-500">*</span>
               </label>
-              <select name="jenis_kelamin" value={formData.jenis_kelamin} onChange={handleChange} className="input-field" required>
+              <select name="jenis_kelamin" value={formData.jenis_kelamin} onChange={handleChange} className="input-field" required disabled={isPengajarEditOnly}>
                 <option value="">Pilih jenis kelamin</option>
                 {JENIS_KELAMIN_OPTIONS.map(jk => <option key={jk} value={jk}>{jk}</option>)}
               </select>
@@ -220,13 +276,13 @@ function SantriForm() {
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mendaftar</label>
-              <input type="date" name="tgl_mendaftar" value={formData.tgl_mendaftar} onChange={handleChange} className="input-field" />
+              <input type="date" name="tgl_mendaftar" value={formData.tgl_mendaftar} onChange={handleChange} className="input-field" disabled={isPengajarEditOnly} />
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
-            <textarea name="alamat" value={formData.alamat} onChange={handleChange} className="input-field" rows={2} placeholder="Alamat lengkap santri" />
+            <textarea name="alamat" value={formData.alamat} onChange={handleChange} className="input-field" rows={2} placeholder="Alamat lengkap santri" disabled={isPengajarEditOnly} />
           </div>
 
           {/* === Data Wali === */}
@@ -235,16 +291,16 @@ function SantriForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nama Wali</label>
-                <input type="text" name="nama_wali" value={formData.nama_wali} onChange={handleChange} className="input-field" placeholder="Nama orang tua / wali" />
+                <input type="text" name="nama_wali" value={formData.nama_wali} onChange={handleChange} className="input-field" placeholder="Nama orang tua / wali" disabled={isPengajarEditOnly} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">No. Telepon Wali</label>
-                <input type="tel" name="no_telp_wali" value={formData.no_telp_wali} onChange={handleChange} className="input-field" placeholder="08xxxxxxxxxx" />
+                <input type="tel" name="no_telp_wali" value={formData.no_telp_wali} onChange={handleChange} className="input-field" placeholder="08xxxxxxxxxx" disabled={isPengajarEditOnly} />
               </div>
             </div>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Email Wali <span className="text-xs text-gray-400">(opsional)</span></label>
-              <input type="email" name="email_wali" value={formData.email_wali} onChange={handleChange} className="input-field" placeholder="email.wali@contoh.com" />
+              <input type="email" name="email_wali" value={formData.email_wali} onChange={handleChange} className="input-field" placeholder="email.wali@contoh.com" disabled={isPengajarEditOnly} />
             </div>
           </div>
 
@@ -252,7 +308,7 @@ function SantriForm() {
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 pt-2 border-t border-gray-100">Status Subsidi</p>
             <label className={`inline-flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all w-full ${formData.is_subsidi ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}>
-              <input type="checkbox" name="is_subsidi" checked={!!formData.is_subsidi} onChange={handleChange} className="w-4 h-4 accent-blue-600" />
+              <input type="checkbox" name="is_subsidi" checked={!!formData.is_subsidi} onChange={handleChange} className="w-4 h-4 accent-blue-600" disabled={isPengajarEditOnly} />
               <div>
                 <p className={`text-sm font-semibold ${formData.is_subsidi ? 'text-blue-800' : 'text-gray-700'}`}>
                   {formData.is_subsidi ? '🟦 Santri Subsidi (SPP Subsidi)' : '⬜ Santri Non Subsidi'}
@@ -266,7 +322,7 @@ function SantriForm() {
           <div className="flex gap-3 pt-2">
             <Link href="/admin/santri" className="btn btn-secondary flex-1 text-center">Batal</Link>
             <button type="submit" className="btn btn-primary flex-1">
-              {isEdit ? '💾 Simpan Perubahan' : '✅ Daftarkan Santri'}
+              {isPengajarEditOnly ? '📘 Simpan Jilid' : isEdit ? '💾 Simpan Perubahan' : '✅ Daftarkan Santri'}
             </button>
           </div>
         </form>

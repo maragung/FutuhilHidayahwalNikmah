@@ -4,13 +4,14 @@ const dotenvPath = path.resolve(__dirname, '../../.env.local');
 const dotenvFallback = path.resolve(__dirname, '../../.env');
 require('dotenv').config({ path: fs.existsSync(dotenvPath) ? dotenvPath : dotenvFallback });
 const { Op } = require('sequelize');
-const { sequelize, Admin, Role, Santri, PembayaranSPP, InfakSedekah, Pengeluaran, JurnalKas, Backup, Saran, Pengaturan, Kegiatan, PembayaranLain, Log } = require('./models');
+const { sequelize, Admin, Role, Santri, PembayaranSPP, InfakSedekah, Pengeluaran, JurnalKas, Backup, Saran, Pengaturan, Kegiatan, PembayaranLain, Log, BukuPrestasiSantri } = require('./models');
 
 const ROLES_DEFAULT = [
+  { id: 6, nama_role: 'Developer',    level: 0, is_system: true, deskripsi: 'Developer / Super Admin – akses penuh termasuk kelola Pimpinan', akses_default: null },
   { id: 1, nama_role: 'Pimpinan TPQ', level: 1, is_system: true, deskripsi: 'Pimpinan / Kepala TPQ – akses penuh', akses_default: null },
-  { id: 2, nama_role: 'Sekretaris',   level: 2, is_system: true, deskripsi: 'Sekretaris – kelola santri & laporan', akses_default: JSON.stringify(['dashboard','santri','tambah_santri','bayar','pembayaran_lain','laporan','jurnal','saran','export_database']) },
-  { id: 3, nama_role: 'Bendahara',    level: 3, is_system: true, deskripsi: 'Bendahara – kelola keuangan',          akses_default: JSON.stringify(['dashboard','santri','bayar','pembayaran_lain','infak','pengeluaran','dana','jurnal','laporan','pengaturan','export_database']) },
-  { id: 4, nama_role: 'Pengajar',     level: 4, is_system: true, deskripsi: 'Pengajar / Ustadz – akses terbatas',  akses_default: JSON.stringify(['dashboard','santri','tambah_santri','bayar','saran']) },
+  { id: 2, nama_role: 'Sekretaris',   level: 2, is_system: true, deskripsi: 'Sekretaris – kelola santri & laporan', akses_default: JSON.stringify(['dashboard','santri','tambah_santri','bayar','pembayaran_lain','laporan','jurnal','saran','notifikasi','prestasi_santri','export_database']) },
+  { id: 3, nama_role: 'Bendahara',    level: 3, is_system: true, deskripsi: 'Bendahara – kelola keuangan',          akses_default: JSON.stringify(['dashboard','santri','bayar','pembayaran_lain','infak','pengeluaran','dana','jurnal','laporan','pengaturan','notifikasi','prestasi_santri','export_database']) },
+  { id: 4, nama_role: 'Pengajar',     level: 4, is_system: true, deskripsi: 'Pengajar / Ustadz – akses terbatas',  akses_default: JSON.stringify(['santri','prestasi_santri','saran','notifikasi','akun']) },
   { id: 5, nama_role: 'Lainnya',      level: 5, is_system: true, deskripsi: 'Role lainnya – akses terbatas',       akses_default: JSON.stringify(['dashboard']) },
 ];
 
@@ -27,21 +28,22 @@ async function migrate() {
     console.log('✅ Semua tabel berhasil dibuat/diupdate!');
     console.log('   • Kolom no_absen tersedia di tabel santri (nullable, integer)');
 
-    // Seed roles default — ensure Developer role exists even on existing installs
-    const roleCount = await Role.count();
-    if (roleCount === 0) {
-      for (const role of ROLES_DEFAULT) {
+    // Sinkronkan role default sistem untuk instalasi baru maupun lama
+    for (const role of ROLES_DEFAULT) {
+      const existingRole = await Role.findOne({ where: { id: role.id } });
+      if (!existingRole) {
         await Role.create(role);
-      }
-      console.log('✅ Role default berhasil dibuat (termasuk Developer)!');
-    } else {
-      // Ensure Developer role exists (for existing installs)
-      const devRole = await Role.findOne({ where: { nama_role: 'Developer' } });
-      if (!devRole) {
-        await Role.create({ id: 6, nama_role: 'Developer', level: 0, is_system: true, deskripsi: 'Developer / Super Admin – akses penuh termasuk kelola Pimpinan', akses_default: null });
-        console.log('✅ Role Developer berhasil ditambahkan!');
+      } else {
+        await existingRole.update({
+          nama_role: role.nama_role,
+          level: role.level,
+          is_system: role.is_system,
+          deskripsi: role.deskripsi,
+          akses_default: role.akses_default,
+        });
       }
     }
+    console.log('✅ Role default sistem berhasil disinkronkan');
 
     // Cek apakah admin sudah ada
     const adminCount = await Admin.count();

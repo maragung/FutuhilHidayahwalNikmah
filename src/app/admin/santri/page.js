@@ -13,13 +13,13 @@ const SORT_OPTIONS = [
 
 export default function DaftarSantriPage() {
   const [loading, setLoading] = useState(true);
-  const [santriList, setSantriList] = useState([]);
   const [statusPembayaran, setStatusPembayaran] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [search, setSearch] = useState('');
   const [tahun, setTahun] = useState(new Date().getFullYear());
   const [selectedKategori, setSelectedKategori] = useState([]); // subsidi|non_subsidi|lunas|laki_laki|perempuan
   const [selectedJilid, setSelectedJilid] = useState([]);
-  const [sortBy, setSortBy] = useState('nama');
+  const [sortBy, setSortBy] = useState('no_absen');
   const [sortDir, setSortDir] = useState('asc');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -39,6 +39,7 @@ export default function DaftarSantriPage() {
   const namaBulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
   const warnaNonSubsidi = safeHexColor(settings.warna_non_subsidi, '#04B816');
   const warnaSubsidi = safeHexColor(settings.warna_subsidi, '#045EB8');
+  const isPengajar = currentUser?.jabatan === 'Pengajar';
 
   const fetchData = async () => {
     const token = localStorage.getItem('auth_token');
@@ -62,6 +63,9 @@ export default function DaftarSantriPage() {
 
   useEffect(() => {
     fetchData();
+    try {
+      setCurrentUser(JSON.parse(localStorage.getItem('admin_data') || 'null'));
+    } catch {}
     // Baca pesan sukses dari URL
     const params = new URLSearchParams(window.location.search);
     const msg = params.get('success');
@@ -108,7 +112,7 @@ export default function DaftarSantriPage() {
   const resetFilter = () => {
     setSelectedKategori([]);
     setSelectedJilid([]);
-    setSortBy('nama');
+    setSortBy('no_absen');
     setSortDir('asc');
   };
 
@@ -237,12 +241,14 @@ export default function DaftarSantriPage() {
           <h1 className="text-2xl font-bold text-gray-800">Data Santri</h1>
           <p className="text-gray-500">Status pembayaran SPP santri</p>
         </div>
-        <Link href="/admin/santri/tambah" className="btn-primary inline-flex items-center gap-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          <span>Tambah Santri</span>
-        </Link>
+        {!isPengajar && (
+          <Link href="/admin/santri/tambah" className="btn-primary inline-flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <span>Tambah Santri</span>
+          </Link>
+        )}
       </div>
 
       {error && (
@@ -364,7 +370,7 @@ export default function DaftarSantriPage() {
             <table className="w-full min-w-[900px]">
               <thead>
                   <tr className="bg-green-50 text-xs text-green-800 font-semibold">
-                    <th className="px-3 py-3 text-center sticky left-0 bg-green-50 w-10" title="Nomor urut tabel (bukan No. Absen)">No</th>
+                    <th className="px-3 py-3 text-center sticky left-0 bg-green-50 w-10" title="Nomor absen santri">No</th>
                     <th className="px-3 py-3 text-left sticky left-10 bg-green-50 min-w-[160px]">Nama Santri</th>
                     <th className="px-3 py-3 text-center uppercase tracking-wide">Jilid</th>
                   {namaBulan.map((b, i) => (
@@ -382,15 +388,14 @@ export default function DaftarSantriPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredData.map((santri, index) => (
+                  filteredData.map((santri) => (
                     <tr
                       key={santri.id}
                       className="table-row cursor-pointer hover:bg-green-50"
                       onClick={() => { setDetailSantri(santri); setShowDetailModal(true); }}
                     >
-                    <td className="px-2 py-3 text-center text-xs text-gray-600 sticky left-0 bg-white w-10">
-                          <div className="font-semibold">{index + 1}</div>
-                          {santri.no_absen && <div className="text-gray-400 mt-0.5">#{santri.no_absen}</div>}
+                        <td className="px-2 py-3 text-center text-xs text-gray-600 sticky left-0 bg-white w-10">
+                          <div className="font-semibold text-sm text-gray-800">{santri.no_absen ?? '-'}</div>
                         </td>
                         <td className="table-cell sticky left-10 bg-white min-w-[160px]">
                         <div>
@@ -533,25 +538,29 @@ export default function DaftarSantriPage() {
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-              <Link
-                href={`/admin/bayar?santri=${detailSantri.id}`}
-                className="btn-primary flex-1 text-center"
-                onClick={() => setShowDetailModal(false)}
-              >
-                💳 Bayar SPP
-              </Link>
-              <button
-                onClick={() => {
-                  setSelectedSantri(detailSantri);
-                  setStatusAction(detailSantri.status_aktif ? 'nonaktif' : 'aktifkan');
-                  setShowDetailModal(false);
-                  setShowDeleteModal(true);
-                }}
-                className={`flex-1 ${detailSantri.status_aktif ? 'btn-danger' : 'btn-primary'}`}
-              >
-                {detailSantri.status_aktif ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
-              </button>
-              {detailSantri.status_aktif && (
+              {!isPengajar && (
+                <Link
+                  href={`/admin/bayar?santri=${detailSantri.id}`}
+                  className="btn-primary flex-1 text-center"
+                  onClick={() => setShowDetailModal(false)}
+                >
+                  💳 Bayar SPP
+                </Link>
+              )}
+              {!isPengajar && (
+                <button
+                  onClick={() => {
+                    setSelectedSantri(detailSantri);
+                    setStatusAction(detailSantri.status_aktif ? 'nonaktif' : 'aktifkan');
+                    setShowDetailModal(false);
+                    setShowDeleteModal(true);
+                  }}
+                  className={`flex-1 ${detailSantri.status_aktif ? 'btn-danger' : 'btn-primary'}`}
+                >
+                  {detailSantri.status_aktif ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
+                </button>
+              )}
+              {!isPengajar && detailSantri.status_aktif && (
                 <button
                   onClick={() => {
                     setSelectedSantri(detailSantri);
@@ -569,7 +578,7 @@ export default function DaftarSantriPage() {
                 className="btn-secondary flex-1 text-center"
                 onClick={() => setShowDetailModal(false)}
               >
-                ✏️ Edit Data
+                {isPengajar ? '📘 Ubah Jilid' : '✏️ Edit Data'}
               </Link>
             </div>
           </div>
