@@ -40,13 +40,15 @@ export default function DaftarSantriPage() {
   const warnaNonSubsidi = safeHexColor(settings.warna_non_subsidi, '#04B816');
   const warnaSubsidi = safeHexColor(settings.warna_subsidi, '#045EB8');
   const isPengajar = currentUser?.jabatan === 'Pengajar';
+  const canManageSantriStatus = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'].includes(currentUser?.jabatan);
+  const canDeleteSantri = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'].includes(currentUser?.jabatan);
 
   const fetchData = async () => {
     const token = localStorage.getItem('auth_token');
     setLoading(true);
     
     try {
-      const res = await fetch(`/api/pembayaran/status?tahun=${tahun}`, {
+      const res = await fetch(`/api/pembayaran/status?tahun=${tahun}&include_nonaktif=true`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -162,6 +164,12 @@ export default function DaftarSantriPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ status_aktif: true, pin }),
         });
+      } else if (statusAction === 'nonaktif') {
+        res = await fetch(`/api/santri/${selectedSantri.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ status_aktif: false, pin }),
+        });
       } else if (statusAction === 'luluskan') {
         res = await fetch(`/api/santri/${selectedSantri.id}`, {
           method: 'PUT',
@@ -183,6 +191,8 @@ export default function DaftarSantriPage() {
           ? 'Santri berhasil diaktifkan kembali'
           : statusAction === 'luluskan'
           ? 'Santri berhasil ditandai lulus'
+          : statusAction === 'hapus'
+          ? 'Santri berhasil dihapus permanen'
           : 'Santri berhasil dinonaktifkan';
         setSuccess(pesanSukses);
         setShowDeleteModal(false);
@@ -538,7 +548,7 @@ export default function DaftarSantriPage() {
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-              {!isPengajar && (
+              {!isPengajar && canManageSantriStatus && (
                 <Link
                   href={`/admin/bayar?santri=${detailSantri.id}`}
                   className="btn-primary flex-1 text-center"
@@ -547,7 +557,7 @@ export default function DaftarSantriPage() {
                   💳 Bayar SPP
                 </Link>
               )}
-              {!isPengajar && (
+              {canManageSantriStatus && (
                 <button
                   onClick={() => {
                     setSelectedSantri(detailSantri);
@@ -560,7 +570,7 @@ export default function DaftarSantriPage() {
                   {detailSantri.status_aktif ? '⛔ Nonaktifkan' : '✅ Aktifkan'}
                 </button>
               )}
-              {!isPengajar && detailSantri.status_aktif && (
+              {canManageSantriStatus && detailSantri.status_aktif && (
                 <button
                   onClick={() => {
                     setSelectedSantri(detailSantri);
@@ -571,6 +581,19 @@ export default function DaftarSantriPage() {
                   className="flex-1 btn-secondary border-yellow-400 text-yellow-700 hover:bg-yellow-50"
                 >
                   🎓 Luluskan
+                </button>
+              )}
+              {canDeleteSantri && (
+                <button
+                  onClick={() => {
+                    setSelectedSantri(detailSantri);
+                    setStatusAction('hapus');
+                    setShowDetailModal(false);
+                    setShowDeleteModal(true);
+                  }}
+                  className="flex-1 btn-danger"
+                >
+                  🗑️ Hapus Santri
                 </button>
               )}
               <Link
@@ -590,13 +613,19 @@ export default function DaftarSantriPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-2">
-              {statusAction === 'luluskan' ? 'Konfirmasi Kelulusan' : 'Konfirmasi'}
+              {statusAction === 'luluskan'
+                ? 'Konfirmasi Kelulusan'
+                : statusAction === 'hapus'
+                ? 'Konfirmasi Hapus Santri'
+                : 'Konfirmasi'}
             </h3>
             <p className="text-gray-600 mb-4">
               {statusAction === 'aktifkan'
                 ? <>Aktifkan kembali santri <strong style={{ color: selectedSantri?.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{selectedSantri?.nama_lengkap}</strong>? Masukkan PIN untuk konfirmasi.</>
                 : statusAction === 'luluskan'
                 ? <>Tandai santri <strong style={{ color: selectedSantri?.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{selectedSantri?.nama_lengkap}</strong> sebagai <strong>LULUS</strong>? Santri akan dipindahkan ke halaman Alumni dan tidak dihitung SPP lagi.</>
+                : statusAction === 'hapus'
+                ? <>Hapus permanen santri <strong style={{ color: selectedSantri?.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{selectedSantri?.nama_lengkap}</strong> dari data santri? Riwayat pembayaran, pembayaran lain, absensi, dan buku prestasi santri ini juga akan ikut terhapus.</>
                 : <>Nonaktifkan santri <strong style={{ color: selectedSantri?.is_subsidi ? warnaSubsidi : warnaNonSubsidi }}>{selectedSantri?.nama_lengkap}</strong>? Masukkan PIN untuk konfirmasi.</>
               }
             </p>
@@ -622,7 +651,7 @@ export default function DaftarSantriPage() {
                 disabled={deleteLoading}
                 className={`${statusAction === 'aktifkan' ? 'btn-primary' : statusAction === 'luluskan' ? 'btn-primary' : 'btn-danger'} flex-1`}
               >
-                {deleteLoading ? 'Memproses...' : (statusAction === 'aktifkan' ? 'Aktifkan' : statusAction === 'luluskan' ? '🎓 Luluskan' : 'Nonaktifkan')}
+                {deleteLoading ? 'Memproses...' : (statusAction === 'aktifkan' ? 'Aktifkan' : statusAction === 'luluskan' ? '🎓 Luluskan' : statusAction === 'hapus' ? '🗑️ Hapus' : 'Nonaktifkan')}
               </button>
             </div>
           </div>

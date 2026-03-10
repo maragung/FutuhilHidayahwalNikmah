@@ -31,19 +31,19 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { santri_id, tanggal, jenis_prestasi, judul_prestasi, jilid, halaman, paraf, keterangan } = body;
+    const { santri_id, tanggal, jilid, paraf, keterangan } = body;
+    const judulPrestasi = String(body.judul_prestasi || '').trim() || null;
+    const halamanPrestasi = String(body.halaman || '').trim() || null;
+    const jenisPrestasi = judulPrestasi ? 'surat_doa' : 'halaman';
 
-    if (!santri_id || !tanggal || !jenis_prestasi) {
-      return NextResponse.json({ success: false, pesan: 'Santri, tanggal, dan jenis prestasi wajib diisi' }, { status: 400 });
+    if (!santri_id || !tanggal) {
+      return NextResponse.json({ success: false, pesan: 'Santri dan tanggal wajib diisi' }, { status: 400 });
     }
-    if (!JENIS_PRESTASI_OPTIONS.includes(jenis_prestasi)) {
+    if (!judulPrestasi && !halamanPrestasi) {
+      return NextResponse.json({ success: false, pesan: 'Isi minimal Surat Pendek / Doa Harian atau Halaman Buku Prestasi Jilid' }, { status: 400 });
+    }
+    if (!JENIS_PRESTASI_OPTIONS.includes(jenisPrestasi)) {
       return NextResponse.json({ success: false, pesan: 'Jenis prestasi tidak valid' }, { status: 400 });
-    }
-    if (jenis_prestasi === 'surat_doa' && !String(judul_prestasi || '').trim()) {
-      return NextResponse.json({ success: false, pesan: 'Surat pendek / doa harian wajib diisi' }, { status: 400 });
-    }
-    if (jenis_prestasi === 'halaman' && !String(halaman || '').trim()) {
-      return NextResponse.json({ success: false, pesan: 'Halaman wajib diisi' }, { status: 400 });
     }
 
     const santri = await Santri.findByPk(santri_id);
@@ -56,12 +56,12 @@ export async function PUT(request, { params }) {
       santri_id: santri.id,
       admin_id: admin.id,
       tanggal,
-      jenis_prestasi,
-      judul_prestasi: jenis_prestasi === 'surat_doa' ? String(judul_prestasi || '').trim() : null,
+      jenis_prestasi: jenisPrestasi,
+      judul_prestasi: judulPrestasi,
       jilid: String(jilid || santri.jilid || '').trim() || santri.jilid,
-      halaman: jenis_prestasi === 'halaman' ? String(halaman || '').trim() : null,
+      halaman: halamanPrestasi,
       ust_nama: admin.nama_lengkap,
-      paraf: jenis_prestasi === 'halaman' ? (String(paraf || '').trim() || admin.nama_lengkap) : null,
+      paraf: String(paraf || '').trim() || admin.nama_lengkap,
       keterangan: String(keterangan || '').trim() || null,
     });
 
