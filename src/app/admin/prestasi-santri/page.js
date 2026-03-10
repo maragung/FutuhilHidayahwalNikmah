@@ -15,7 +15,6 @@ const createInitialForm = (ustName = '') => ({
 export default function PrestasiSantriPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [santriList, setSantriList] = useState([]);
   const [prestasiList, setPrestasiList] = useState([]);
@@ -212,83 +211,6 @@ export default function PrestasiSantriPage() {
     }
   };
 
-  const exportSection = async (format) => {
-    setExporting(true);
-    setError('');
-
-    try {
-      if (filteredPrestasi.length === 0) {
-        throw new Error('Belum ada data untuk diekspor');
-      }
-
-      const rows = filteredPrestasi.map((item) => ({
-        nama_santri: item.santri?.nama_lengkap || '-',
-        no_absen: item.santri?.no_absen ?? '-',
-        tanggal: item.tanggal || '-',
-        jilid: item.jilid || item.santri?.jilid || '-',
-        surat_doa: item.judul_prestasi || '-',
-        halaman: item.halaman || '-',
-        ust: item.ust_nama || '-',
-        paraf: item.paraf || '-',
-        keterangan: item.keterangan || '-',
-      }));
-
-      const title = `Buku Prestasi Santri ${tahun}${bulan ? `-${bulan}` : ''}`;
-
-      if (format === 'excel') {
-        const XLSX = (await import('xlsx')).default;
-        const exportRows = rows.map((row) => ({
-          'Nama Santri': row.nama_santri,
-          'No. Absen': row.no_absen,
-          Tanggal: row.tanggal,
-          Jilid: row.jilid,
-          'Surat Pendek / Doa Harian': row.surat_doa,
-          Halaman: row.halaman,
-          Ust: row.ust,
-          Paraf: row.paraf,
-          Keterangan: row.keterangan,
-        }));
-        const ws = XLSX.utils.json_to_sheet(exportRows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Prestasi');
-        XLSX.writeFile(wb, `${title}.xlsx`);
-      } else {
-        const { jsPDF } = await import('jspdf');
-        await import('jspdf-autotable');
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const headers = [['Nama Santri', 'No. Absen', 'Tanggal', 'Jilid', 'Surat Pendek / Doa Harian', 'Halaman', 'Ust', 'Paraf', 'Keterangan']];
-        const body = rows.map((row) => [
-          row.nama_santri,
-          row.no_absen,
-          row.tanggal,
-          row.jilid,
-          row.surat_doa,
-          row.halaman,
-          row.ust,
-          row.paraf,
-          row.keterangan,
-        ]);
-
-        doc.setFontSize(14);
-        doc.text(title, 14, 15);
-        doc.autoTable({
-          head: headers,
-          body,
-          startY: 22,
-          styles: { fontSize: 8, cellPadding: 2 },
-          headStyles: { fillColor: [22, 163, 74] },
-        });
-        doc.save(`${title}.pdf`);
-      }
-
-      setSuccess('Export buku prestasi santri berhasil dibuat');
-    } catch (err) {
-      setError(err.message || 'Gagal mengekspor buku prestasi santri');
-    } finally {
-      setExporting(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -405,14 +327,6 @@ export default function PrestasiSantriPage() {
                   placeholder="Cari santri, jilid, ust, surat/doa, halaman, atau catatan"
                   className="input-field min-w-[280px]"
                 />
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => exportSection('excel')} disabled={exporting} className="btn-secondary whitespace-nowrap">
-                    {exporting ? 'Memproses...' : 'Export Excel'}
-                  </button>
-                  <button type="button" onClick={() => exportSection('pdf')} disabled={exporting} className="btn-primary whitespace-nowrap">
-                    {exporting ? 'Memproses...' : 'Export PDF'}
-                  </button>
-                </div>
               </div>
             </div>
           </div>
