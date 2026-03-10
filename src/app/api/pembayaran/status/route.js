@@ -60,19 +60,39 @@ export async function GET(request) {
       let bulanTerbayar = 0;
       let bulanWajib = 0;
 
-      const tglDaftar = new Date(santri.tgl_mendaftar);
-      const tahunDaftar = tglDaftar.getFullYear();
-      const bulanDaftar = tglDaftar.getMonth() + 1;
-
-      const bulanAwalWajib = tahun < tahunDaftar ? 13 : (tahun === tahunDaftar ? bulanDaftar : 1);
+      // Parse tgl_mendaftar secara UTC agar tidak terpengaruh timezone server.
+      // new Date('2024-07-15') selalu UTC midnight → getUTCMonth() = 6 (Juli)
+      // Jika tgl_mendaftar null/kosong/invalid → bulanAwalWajib = 1 (Jan)
+      let tahunDaftar = null;
+      let bulanDaftar = null;
+      if (santri.tgl_mendaftar) {
+        const tglDaftar = new Date(santri.tgl_mendaftar);
+        if (!isNaN(tglDaftar.getTime())) {
+          tahunDaftar = tglDaftar.getUTCFullYear();
+          bulanDaftar  = tglDaftar.getUTCMonth() + 1; // 1-12
+        }
+      }
+      // bulanAwalWajib:
+      //   13  → tahun sebelum daftar (semua bulan 'Belum Terdaftar')
+      //   N   → bulan pendaftaran (Jan–(N-1) 'Belum Terdaftar')
+      //   1   → tahun setelah daftar atau tgl_mendaftar tidak diketahui (semua wajib)
+      const bulanAwalWajib = (tahunDaftar === null)
+        ? 1
+        : tahun < tahunDaftar
+          ? 13
+          : tahun === tahunDaftar
+            ? bulanDaftar
+            : 1;
       let bulanAkhirWajib = 12;
 
       if (santri.tgl_nonaktif) {
         const tglNonaktif = new Date(santri.tgl_nonaktif);
-        if (tglNonaktif.getFullYear() < tahun) {
-          bulanAkhirWajib = 0;
-        } else if (tglNonaktif.getFullYear() === tahun) {
-          bulanAkhirWajib = tglNonaktif.getMonth();
+        if (!isNaN(tglNonaktif.getTime())) {
+          if (tglNonaktif.getUTCFullYear() < tahun) {
+            bulanAkhirWajib = 0;
+          } else if (tglNonaktif.getUTCFullYear() === tahun) {
+            bulanAkhirWajib = tglNonaktif.getUTCMonth(); // bulan nonaktif tdk wajib
+          }
         }
       }
 

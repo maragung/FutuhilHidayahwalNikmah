@@ -1,5 +1,36 @@
 const fs = require('fs');
 const path = require('path');
+
+// ─── Backup helper ────────────────────────────────────────────────────────────
+// Ekspor semua tabel ke file JSON sebelum seed berjalan.
+// File disimpan di <project-root>/backups/ dengan nama otomatis (timestamp).
+// Jika nama sudah ada (sangat jarang), tambah _1, _2, dst.
+async function backupDatabase(models) {
+  const backupDir = path.resolve(__dirname, '../../backups');
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+
+  const ts = new Date().toISOString().replace(/T/, '_').replace(/[:.]/g, '-').slice(0, 19);
+  let backupPath = path.join(backupDir, `backup_before_seed_${ts}.json`);
+  let counter = 1;
+  while (fs.existsSync(backupPath)) {
+    backupPath = path.join(backupDir, `backup_before_seed_${ts}_${counter}.json`);
+    counter++;
+  }
+
+  const data = {};
+  for (const Model of models) {
+    try {
+      const rows = await Model.findAll({ raw: true });
+      data[Model.getTableName ? Model.getTableName() : Model.tableName] = rows;
+    } catch (e) {
+      data[Model.name || 'unknown'] = `[error: ${e.message}]`;
+    }
+  }
+
+  fs.writeFileSync(backupPath, JSON.stringify(data, null, 2), 'utf-8');
+  return backupPath;
+}
+// ──────────────────────────────────────────────────────────────────────────────
 const dotenvPath = path.resolve(__dirname, '../../.env.local');
 const dotenvFallback = path.resolve(__dirname, '../../.env');
 require('dotenv').config({ path: fs.existsSync(dotenvPath) ? dotenvPath : dotenvFallback });
@@ -38,6 +69,17 @@ async function seed() {
     console.log('🔄 Menjalankan seed minimal (reset data)...');
     await sequelize.authenticate();
     console.log('✅ Koneksi database berhasil');
+
+    // ── Backup sebelum reset ─────────────────────────────────────────────────
+    console.log('💾 Membuat backup database sebelum seed...');
+    const allModels = [
+      Role, Admin, Santri, PembayaranSPP, PembayaranLain, InfakSedekah,
+      Pengeluaran, JurnalKas, Backup, Saran, Pengaturan, Kegiatan,
+      Absensi, EmailServer, EmailLog, Log,
+    ];
+    const backupFile = await backupDatabase(allModels);
+    console.log(`✅ Backup tersimpan: ${backupFile}`);
+    // ────────────────────────────────────────────────────────────────────────
 
     // Disable foreign key checks to allow truncation
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0', { transaction: t });
