@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Santri, PembayaranSPP, Admin } from '@/lib/models';
+import { Santri, PembayaranSPP, PembayaranLain, Absensi, BukuPrestasiSantri, Admin } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { createBackup } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
-const ROLE_BISA_KELOLA_STATUS = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
+const ROLE_BISA_KELOLA_STATUS = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'];
 const ROLE_BISA_EDIT_SANTRI   = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
+const ROLE_BISA_HAPUS_SANTRI  = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'];
 const JENIS_KELAMIN_OPTIONS = ['Laki-laki', 'Perempuan'];
 
 // GET - Ambil santri berdasarkan ID (auth required)
@@ -203,7 +204,7 @@ export async function PUT(request, { params }) {
   }
 }
 
-// DELETE - Hapus santri (soft delete dengan PIN)
+// DELETE - Hapus santri permanen dengan PIN
 export async function DELETE(request, { params }) {
   try {
     await sequelize.authenticate();
@@ -239,17 +240,20 @@ export async function DELETE(request, { params }) {
       );
     }
     
-    if (!ROLE_BISA_KELOLA_STATUS.includes(auth.user.jabatan)) {
+    if (!ROLE_BISA_HAPUS_SANTRI.includes(auth.user.jabatan)) {
       return NextResponse.json(
-        { success: false, pesan: 'Tidak memiliki akses untuk menonaktifkan santri' },
+        { success: false, pesan: 'Tidak memiliki akses untuk menghapus santri' },
         { status: 403 }
       );
     }
 
     const dataSebelum = santri.toJSON();
-    
-    // Soft delete - set status_aktif ke false
-    await santri.update({ status_aktif: false, tgl_nonaktif: new Date().toISOString().split('T')[0] });
+
+    await BukuPrestasiSantri.destroy({ where: { santri_id: santri.id } });
+    await Absensi.destroy({ where: { santri_id: santri.id } });
+    await PembayaranLain.destroy({ where: { santri_id: santri.id } });
+    await PembayaranSPP.destroy({ where: { santri_id: santri.id } });
+    await santri.destroy();
     
     // Backup
     await createBackup('Hapus Santri', 'santri', dataSebelum, null, auth.user.id);
@@ -259,7 +263,7 @@ export async function DELETE(request, { params }) {
       const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
       await kirimEmailAksiAdmin({
         aksi: 'Santri Dihapus',
-        deskripsi: `Santri ${dataSebelum.nama_lengkap} (${dataSebelum.nik}) telah dinonaktifkan`,
+        deskripsi: `Santri ${dataSebelum.nama_lengkap} (${dataSebelum.nik}) telah dihapus permanen`,
         detail: '',
         adminNama: auth.user.nama_lengkap,
         adminJabatan: auth.user.jabatan,
@@ -271,7 +275,7 @@ export async function DELETE(request, { params }) {
     
     return NextResponse.json({
       success: true,
-      pesan: 'Santri berhasil dihapus',
+      pesan: 'Santri berhasil dihapus permanen',
     });
   } catch (error) {
     console.error('Delete santri error:', error);

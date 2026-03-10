@@ -2,27 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-const TAB_OPTIONS = [
-  { key: 'surat_doa', label: 'Surat Pendek & Doa Harian' },
-  { key: 'halaman', label: 'Buku Prestasi Halaman' },
-];
-
-const initialSuratForm = {
+const createInitialForm = (ustName = '') => ({
   santri_id: '',
   tanggal: new Date().toISOString().split('T')[0],
   jilid: '',
   judul_prestasi: '',
-  keterangan: '',
-};
-
-const initialHalamanForm = {
-  santri_id: '',
-  tanggal: new Date().toISOString().split('T')[0],
-  jilid: '',
   halaman: '',
-  paraf: '',
+  paraf: ustName,
   keterangan: '',
-};
+});
 
 export default function PrestasiSantriPage() {
   const [loading, setLoading] = useState(true);
@@ -31,19 +19,19 @@ export default function PrestasiSantriPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [santriList, setSantriList] = useState([]);
   const [prestasiList, setPrestasiList] = useState([]);
-  const [tab, setTab] = useState('surat_doa');
   const [tahun, setTahun] = useState(new Date().getFullYear());
   const [bulan, setBulan] = useState('');
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [suratForm, setSuratForm] = useState(initialSuratForm);
-  const [halamanForm, setHalamanForm] = useState(initialHalamanForm);
+  const [form, setForm] = useState(createInitialForm());
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 
   const fetchData = async () => {
+    if (!token) return;
+
     setLoading(true);
     setError('');
 
@@ -69,7 +57,7 @@ export default function PrestasiSantriPage() {
       setSantriList(santriData.data || []);
       setPrestasiList(prestasiData.data || []);
     } catch (err) {
-      setError(err.message || 'Gagal memuat data buku prestasi');
+      setError(err.message || 'Gagal memuat data buku prestasi santri');
     } finally {
       setLoading(false);
     }
@@ -77,21 +65,22 @@ export default function PrestasiSantriPage() {
 
   useEffect(() => {
     try {
-      setCurrentUser(JSON.parse(localStorage.getItem('admin_data') || 'null'));
+      const adminData = JSON.parse(localStorage.getItem('admin_data') || 'null');
+      setCurrentUser(adminData);
+      setForm(createInitialForm(adminData?.nama_lengkap || ''));
     } catch {
       setCurrentUser(null);
+      setForm(createInitialForm());
     }
   }, []);
 
   useEffect(() => {
-    if (!token) return;
     fetchData();
   }, [tahun, bulan]);
 
   const filteredPrestasi = useMemo(() => {
     const q = search.trim().toLowerCase();
     return prestasiList.filter((item) => {
-      if (item.jenis_prestasi !== tab) return false;
       if (!q) return true;
 
       const kandidat = [
@@ -109,7 +98,7 @@ export default function PrestasiSantriPage() {
 
       return kandidat.includes(q);
     });
-  }, [prestasiList, search, tab]);
+  }, [prestasiList, search]);
 
   const yearOptions = useMemo(() => {
     const now = new Date().getFullYear();
@@ -118,64 +107,37 @@ export default function PrestasiSantriPage() {
 
   const getSantriById = (id) => santriList.find((item) => String(item.id) === String(id));
 
-  const updateSuratForm = (key, value) => {
-    if (key === 'santri_id') {
-      const santri = getSantriById(value);
-      setSuratForm((prev) => ({ ...prev, santri_id: value, jilid: santri?.jilid || '' }));
-      return;
-    }
-    setSuratForm((prev) => ({ ...prev, [key]: value }));
+  const resetForm = () => {
+    setEditingId(null);
+    setForm(createInitialForm(currentUser?.nama_lengkap || ''));
   };
 
-  const updateHalamanForm = (key, value) => {
+  const updateForm = (key, value) => {
     if (key === 'santri_id') {
       const santri = getSantriById(value);
-      setHalamanForm((prev) => ({
+      setForm((prev) => ({
         ...prev,
         santri_id: value,
-        jilid: santri?.jilid || '',
-        paraf: prev.paraf || currentUser?.nama_lengkap || '',
+        jilid: santri?.jilid || prev.jilid,
       }));
       return;
     }
-    setHalamanForm((prev) => ({ ...prev, [key]: value }));
-  };
 
-  const resetForms = () => {
-    setEditingId(null);
-    setSuratForm(initialSuratForm);
-    setHalamanForm({ ...initialHalamanForm, paraf: currentUser?.nama_lengkap || '' });
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
-
-  useEffect(() => {
-    if (currentUser?.nama_lengkap) {
-      setHalamanForm((prev) => ({ ...prev, paraf: prev.paraf || currentUser.nama_lengkap }));
-    }
-  }, [currentUser]);
 
   const handleEdit = (item) => {
     setEditingId(item.id);
-    setTab(item.jenis_prestasi);
-
-    if (item.jenis_prestasi === 'surat_doa') {
-      setSuratForm({
-        santri_id: String(item.santri_id || item.santri?.id || ''),
-        tanggal: item.tanggal || new Date().toISOString().split('T')[0],
-        jilid: item.jilid || item.santri?.jilid || '',
-        judul_prestasi: item.judul_prestasi || '',
-        keterangan: item.keterangan || '',
-      });
-    } else {
-      setHalamanForm({
-        santri_id: String(item.santri_id || item.santri?.id || ''),
-        tanggal: item.tanggal || new Date().toISOString().split('T')[0],
-        jilid: item.jilid || item.santri?.jilid || '',
-        halaman: item.halaman || '',
-        paraf: item.paraf || item.ust_nama || currentUser?.nama_lengkap || '',
-        keterangan: item.keterangan || '',
-      });
-    }
-+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setForm({
+      santri_id: String(item.santri_id || item.santri?.id || ''),
+      tanggal: item.tanggal || new Date().toISOString().split('T')[0],
+      jilid: item.jilid || item.santri?.jilid || '',
+      judul_prestasi: item.judul_prestasi || '',
+      halaman: item.halaman || '',
+      paraf: item.paraf || item.ust_nama || currentUser?.nama_lengkap || '',
+      keterangan: item.keterangan || '',
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (item) => {
@@ -193,9 +155,10 @@ export default function PrestasiSantriPage() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.pesan || 'Gagal menghapus prestasi');
+
       setSuccess(data.pesan || 'Catatan prestasi berhasil dihapus');
-      if (editingId === item.id) resetForms();
-      fetchData();
+      if (editingId === item.id) resetForm();
+      await fetchData();
     } catch (err) {
       setError(err.message || 'Gagal menghapus prestasi');
     } finally {
@@ -203,36 +166,45 @@ export default function PrestasiSantriPage() {
     }
   };
 
-  const submitSurat = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     setSuccess('');
 
     try {
-      if (!suratForm.santri_id || !suratForm.tanggal || !suratForm.judul_prestasi.trim()) {
-        throw new Error('Nama santri, tanggal, dan surat/doa wajib diisi');
+      const judulPrestasi = form.judul_prestasi.trim();
+      const halaman = form.halaman.trim();
+
+      if (!form.santri_id || !form.tanggal) {
+        throw new Error('Nama santri dan tanggal wajib diisi');
+      }
+      if (!judulPrestasi && !halaman) {
+        throw new Error('Isi minimal Surat Pendek & Doa Harian atau Halaman Buku Prestasi Jilid');
       }
 
       const payload = {
-        ...suratForm,
-        jenis_prestasi: 'surat_doa',
+        ...form,
+        judul_prestasi: judulPrestasi,
+        halaman,
       };
 
-      const res = await fetch(editingId && tab === 'surat_doa' ? `/api/prestasi-santri/${editingId}` : '/api/prestasi-santri', {
-        method: editingId && tab === 'surat_doa' ? 'PUT' : 'POST',
+      const isEditing = Boolean(editingId);
+      const res = await fetch(isEditing ? `/api/prestasi-santri/${editingId}` : '/api/prestasi-santri', {
+        method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       if (!data.success) throw new Error(data.pesan || 'Gagal menyimpan prestasi');
 
       setSuccess(data.pesan || 'Catatan prestasi berhasil disimpan');
-      resetForms();
-      fetchData();
+      resetForm();
+      await fetchData();
     } catch (err) {
       setError(err.message || 'Gagal menyimpan prestasi');
     } finally {
@@ -240,55 +212,20 @@ export default function PrestasiSantriPage() {
     }
   };
 
-  const submitHalaman = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      if (!halamanForm.santri_id || !halamanForm.tanggal || !halamanForm.halaman.trim()) {
-        throw new Error('Nama santri, tanggal, dan halaman wajib diisi');
-      }
-
-      const payload = {
-        ...halamanForm,
-        jenis_prestasi: 'halaman',
-      };
-
-      const res = await fetch(editingId && tab === 'halaman' ? `/api/prestasi-santri/${editingId}` : '/api/prestasi-santri', {
-        method: editingId && tab === 'halaman' ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.pesan || 'Gagal menyimpan prestasi halaman');
-
-      setSuccess(data.pesan || 'Catatan prestasi berhasil disimpan');
-      resetForms();
-      fetchData();
-    } catch (err) {
-      setError(err.message || 'Gagal menyimpan prestasi halaman');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const exportSection = async (format, jenis) => {
+  const exportSection = async (format) => {
     setExporting(true);
     setError('');
 
     try {
-      const data = prestasiList.filter((item) => item.jenis_prestasi === jenis);
-      if (data.length === 0) throw new Error('Belum ada data untuk diekspor');
+      if (filteredPrestasi.length === 0) {
+        throw new Error('Belum ada data untuk diekspor');
+      }
 
-      const rows = data.map((item) => ({
+      const rows = filteredPrestasi.map((item) => ({
         nama_santri: item.santri?.nama_lengkap || '-',
-        jilid: item.jilid || item.santri?.jilid || '-',
+        no_absen: item.santri?.no_absen ?? '-',
         tanggal: item.tanggal || '-',
+        jilid: item.jilid || item.santri?.jilid || '-',
         surat_doa: item.judul_prestasi || '-',
         halaman: item.halaman || '-',
         ust: item.ust_nama || '-',
@@ -296,30 +233,21 @@ export default function PrestasiSantriPage() {
         keterangan: item.keterangan || '-',
       }));
 
-      const title = jenis === 'surat_doa'
-        ? `Buku Prestasi Surat Pendek & Doa ${tahun}${bulan ? `-${bulan}` : ''}`
-        : `Buku Prestasi Halaman ${tahun}${bulan ? `-${bulan}` : ''}`;
+      const title = `Buku Prestasi Santri ${tahun}${bulan ? `-${bulan}` : ''}`;
 
       if (format === 'excel') {
         const XLSX = (await import('xlsx')).default;
-        const exportRows = rows.map((row) => jenis === 'surat_doa'
-          ? {
-              'Nama Santri': row.nama_santri,
-              Jilid: row.jilid,
-              Tanggal: row.tanggal,
-              'Surat Pendek / Doa Harian': row.surat_doa,
-              Ust: row.ust,
-              Keterangan: row.keterangan,
-            }
-          : {
-              'Nama Santri': row.nama_santri,
-              Tanggal: row.tanggal,
-              Jilid: row.jilid,
-              Halaman: row.halaman,
-              Ust: row.ust,
-              Paraf: row.paraf,
-              Keterangan: row.keterangan,
-            });
+        const exportRows = rows.map((row) => ({
+          'Nama Santri': row.nama_santri,
+          'No. Absen': row.no_absen,
+          Tanggal: row.tanggal,
+          Jilid: row.jilid,
+          'Surat Pendek / Doa Harian': row.surat_doa,
+          Halaman: row.halaman,
+          Ust: row.ust,
+          Paraf: row.paraf,
+          Keterangan: row.keterangan,
+        }));
         const ws = XLSX.utils.json_to_sheet(exportRows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Prestasi');
@@ -328,12 +256,18 @@ export default function PrestasiSantriPage() {
         const { jsPDF } = await import('jspdf');
         await import('jspdf-autotable');
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const headers = jenis === 'surat_doa'
-          ? [['Nama Santri', 'Jilid', 'Tanggal', 'Surat Pendek / Doa Harian', 'Ust', 'Keterangan']]
-          : [['Nama Santri', 'Tanggal', 'Jilid', 'Halaman', 'Ust', 'Paraf', 'Keterangan']];
-        const body = rows.map((row) => jenis === 'surat_doa'
-          ? [row.nama_santri, row.jilid, row.tanggal, row.surat_doa, row.ust, row.keterangan]
-          : [row.nama_santri, row.tanggal, row.jilid, row.halaman, row.ust, row.paraf, row.keterangan]);
+        const headers = [['Nama Santri', 'No. Absen', 'Tanggal', 'Jilid', 'Surat Pendek / Doa Harian', 'Halaman', 'Ust', 'Paraf', 'Keterangan']];
+        const body = rows.map((row) => [
+          row.nama_santri,
+          row.no_absen,
+          row.tanggal,
+          row.jilid,
+          row.surat_doa,
+          row.halaman,
+          row.ust,
+          row.paraf,
+          row.keterangan,
+        ]);
 
         doc.setFontSize(14);
         doc.text(title, 14, 15);
@@ -347,9 +281,9 @@ export default function PrestasiSantriPage() {
         doc.save(`${title}.pdf`);
       }
 
-      setSuccess('Export buku prestasi berhasil dibuat');
+      setSuccess('Export buku prestasi santri berhasil dibuat');
     } catch (err) {
-      setError(err.message || 'Gagal mengekspor buku prestasi');
+      setError(err.message || 'Gagal mengekspor buku prestasi santri');
     } finally {
       setExporting(false);
     }
@@ -360,7 +294,7 @@ export default function PrestasiSantriPage() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Buku Prestasi Santri</h1>
-          <p className="text-gray-500">Catatan surat pendek, doa harian, dan prestasi halaman santri.</p>
+          <p className="text-gray-500">Catat Surat Pendek &amp; Doa Harian atau Halaman Buku Prestasi Jilid santri dalam satu form.</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <select value={tahun} onChange={(e) => setTahun(parseInt(e.target.value, 10))} className="input-field w-32">
@@ -394,113 +328,65 @@ export default function PrestasiSantriPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[420px,1fr] gap-6">
         <div className="card space-y-4 h-fit">
-          <div className="flex flex-wrap gap-2">
-            {TAB_OPTIONS.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => { setTab(item.key); setEditingId(null); setError(''); setSuccess(''); }}
-                className={`px-3 py-2 rounded-lg text-sm font-medium border ${tab === item.key ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300'}`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="border-t border-gray-100 pt-4">
+          <div className="border-b border-gray-100 pb-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-lg font-semibold text-gray-800">
-                  {editingId ? 'Edit Catatan Prestasi' : 'Tambah Catatan Prestasi'}
+                  {editingId ? 'Edit Buku Prestasi Santri' : 'Tambah Buku Prestasi Santri'}
                 </h2>
                 <p className="text-xs text-gray-500">Ust terisi otomatis dari akun login: <strong>{currentUser?.nama_lengkap || '-'}</strong></p>
               </div>
               {editingId && (
-                <button onClick={resetForms} type="button" className="text-sm text-red-600 hover:text-red-700">Batal Edit</button>
+                <button onClick={resetForm} type="button" className="text-sm text-red-600 hover:text-red-700">Batal Edit</button>
               )}
             </div>
 
-            {tab === 'surat_doa' ? (
-              <form className="space-y-3" onSubmit={submitSurat}>
+            <form className="space-y-3" onSubmit={handleSubmit}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Santri</label>
+                <select value={form.santri_id} onChange={(e) => updateForm('santri_id', e.target.value)} className="input-field" required>
+                  <option value="">Pilih santri</option>
+                  {santriList.map((item) => (
+                    <option key={item.id} value={item.id}>{item.no_absen ? `${item.no_absen}. ` : ''}{item.nama_lengkap} ({item.jilid || '-'})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nama Santri</label>
-                  <select value={suratForm.santri_id} onChange={(e) => updateSuratForm('santri_id', e.target.value)} className="input-field" required>
-                    <option value="">Pilih santri</option>
-                    {santriList.map((item) => (
-                      <option key={item.id} value={item.id}>{item.no_absen ? `${item.no_absen}. ` : ''}{item.nama_lengkap} ({item.jilid || '-'})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Jilid</label>
-                    <input value={suratForm.jilid} onChange={(e) => updateSuratForm('jilid', e.target.value)} className="input-field" placeholder="Jilid" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
-                    <input type="date" value={suratForm.tanggal} onChange={(e) => updateSuratForm('tanggal', e.target.value)} className="input-field" required />
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Jilid</label>
+                  <input value={form.jilid} onChange={(e) => updateForm('jilid', e.target.value)} className="input-field" placeholder="Jilid" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Surat Pendek / Doa Harian</label>
-                  <input value={suratForm.judul_prestasi} onChange={(e) => updateSuratForm('judul_prestasi', e.target.value)} className="input-field" placeholder="Contoh: An-Nas / Doa sebelum belajar" required />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+                  <input type="date" value={form.tanggal} onChange={(e) => updateForm('tanggal', e.target.value)} className="input-field" required />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ust</label>
-                  <input value={currentUser?.nama_lengkap || ''} className="input-field bg-gray-50 text-gray-500" disabled />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan</label>
-                  <textarea value={suratForm.keterangan} onChange={(e) => updateSuratForm('keterangan', e.target.value)} className="input-field" rows={3} placeholder="Catatan tambahan" />
-                </div>
-                <button type="submit" disabled={saving} className="btn-primary w-full">
-                  {saving ? 'Menyimpan...' : editingId && tab === 'surat_doa' ? 'Simpan Perubahan' : 'Tambah Catatan'}
-                </button>
-              </form>
-            ) : (
-              <form className="space-y-3" onSubmit={submitHalaman}>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nama Santri</label>
-                  <select value={halamanForm.santri_id} onChange={(e) => updateHalamanForm('santri_id', e.target.value)} className="input-field" required>
-                    <option value="">Pilih santri</option>
-                    {santriList.map((item) => (
-                      <option key={item.id} value={item.id}>{item.no_absen ? `${item.no_absen}. ` : ''}{item.nama_lengkap} ({item.jilid || '-'})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
-                    <input type="date" value={halamanForm.tanggal} onChange={(e) => updateHalamanForm('tanggal', e.target.value)} className="input-field" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Jilid</label>
-                    <input value={halamanForm.jilid} onChange={(e) => updateHalamanForm('jilid', e.target.value)} className="input-field" placeholder="Jilid" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Halaman</label>
-                    <input value={halamanForm.halaman} onChange={(e) => updateHalamanForm('halaman', e.target.value)} className="input-field" placeholder="Contoh: 12-13" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Paraf</label>
-                    <input value={halamanForm.paraf} onChange={(e) => updateHalamanForm('paraf', e.target.value)} className="input-field" placeholder="Paraf / nama singkat ust" />
-                  </div>
-                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Surat Pendek / Doa Harian</label>
+                <input value={form.judul_prestasi} onChange={(e) => updateForm('judul_prestasi', e.target.value)} className="input-field" placeholder="Contoh: An-Nas / Doa sebelum belajar" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Halaman Buku Prestasi Jilid</label>
+                <input value={form.halaman} onChange={(e) => updateForm('halaman', e.target.value)} className="input-field" placeholder="Contoh: 12-13" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ust</label>
                   <input value={currentUser?.nama_lengkap || ''} className="input-field bg-gray-50 text-gray-500" disabled />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan</label>
-                  <textarea value={halamanForm.keterangan} onChange={(e) => updateHalamanForm('keterangan', e.target.value)} className="input-field" rows={3} placeholder="Catatan tambahan" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Paraf</label>
+                  <input value={form.paraf} onChange={(e) => updateForm('paraf', e.target.value)} className="input-field" placeholder="Paraf / nama singkat ust" />
                 </div>
-                <button type="submit" disabled={saving} className="btn-primary w-full">
-                  {saving ? 'Menyimpan...' : editingId && tab === 'halaman' ? 'Simpan Perubahan' : 'Tambah Catatan'}
-                </button>
-              </form>
-            )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan</label>
+                <textarea value={form.keterangan} onChange={(e) => updateForm('keterangan', e.target.value)} className="input-field" rows={3} placeholder="Catatan tambahan" />
+              </div>
+              <button type="submit" disabled={saving} className="btn-primary w-full">
+                {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Tambah Catatan'}
+              </button>
+            </form>
           </div>
         </div>
 
@@ -508,7 +394,7 @@ export default function PrestasiSantriPage() {
           <div className="card">
             <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-800">{TAB_OPTIONS.find((item) => item.key === tab)?.label}</h2>
+                <h2 className="text-lg font-semibold text-gray-800">Daftar Buku Prestasi Santri</h2>
                 <p className="text-sm text-gray-500">{filteredPrestasi.length} catatan ditemukan</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -516,14 +402,14 @@ export default function PrestasiSantriPage() {
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cari santri, jilid, ust, atau catatan"
-                  className="input-field min-w-[260px]"
+                  placeholder="Cari santri, jilid, ust, surat/doa, halaman, atau catatan"
+                  className="input-field min-w-[280px]"
                 />
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => exportSection('excel', tab)} disabled={exporting} className="btn-secondary whitespace-nowrap">
+                  <button type="button" onClick={() => exportSection('excel')} disabled={exporting} className="btn-secondary whitespace-nowrap">
                     {exporting ? 'Memproses...' : 'Export Excel'}
                   </button>
-                  <button type="button" onClick={() => exportSection('pdf', tab)} disabled={exporting} className="btn-primary whitespace-nowrap">
+                  <button type="button" onClick={() => exportSection('pdf')} disabled={exporting} className="btn-primary whitespace-nowrap">
                     {exporting ? 'Memproses...' : 'Export PDF'}
                   </button>
                 </div>
@@ -533,55 +419,19 @@ export default function PrestasiSantriPage() {
 
           <div className="card p-0 overflow-hidden">
             {loading ? (
-              <div className="p-6 text-center text-gray-500">Memuat data buku prestasi...</div>
+              <div className="p-6 text-center text-gray-500">Memuat data buku prestasi santri...</div>
             ) : filteredPrestasi.length === 0 ? (
               <div className="p-6 text-center text-gray-500">Belum ada catatan prestasi untuk filter ini.</div>
-            ) : tab === 'surat_doa' ? (
-              <div className="table-container">
-                <table className="w-full min-w-[900px]">
-                  <thead>
-                    <tr className="bg-green-50 text-xs text-green-800 font-semibold">
-                      <th className="px-3 py-3 text-left">Nama Santri</th>
-                      <th className="px-3 py-3 text-left">Jilid</th>
-                      <th className="px-3 py-3 text-left">Tanggal</th>
-                      <th className="px-3 py-3 text-left">Surat Pendek & Doa Harian</th>
-                      <th className="px-3 py-3 text-left">Ust</th>
-                      <th className="px-3 py-3 text-left">Keterangan</th>
-                      <th className="px-3 py-3 text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredPrestasi.map((item) => (
-                      <tr key={item.id} className="table-row">
-                        <td className="table-cell">
-                          <div className="font-medium text-gray-800">{item.santri?.nama_lengkap || '-'}</div>
-                          <div className="text-xs text-gray-500">No. Absen: {item.santri?.no_absen ?? '-'}</div>
-                        </td>
-                        <td className="table-cell">{item.jilid || item.santri?.jilid || '-'}</td>
-                        <td className="table-cell">{item.tanggal ? new Date(item.tanggal).toLocaleDateString('id-ID') : '-'}</td>
-                        <td className="table-cell">{item.judul_prestasi || '-'}</td>
-                        <td className="table-cell">{item.ust_nama || '-'}</td>
-                        <td className="table-cell">{item.keterangan || '-'}</td>
-                        <td className="px-3 py-3 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => handleEdit(item)} className="text-blue-600 hover:text-blue-700 text-sm font-medium">Edit</button>
-                            <button onClick={() => handleDelete(item)} className="text-red-600 hover:text-red-700 text-sm font-medium">Hapus</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             ) : (
               <div className="table-container">
-                <table className="w-full min-w-[980px]">
+                <table className="w-full min-w-[1180px]">
                   <thead>
                     <tr className="bg-green-50 text-xs text-green-800 font-semibold">
                       <th className="px-3 py-3 text-left">Nama Santri</th>
                       <th className="px-3 py-3 text-left">Tanggal</th>
                       <th className="px-3 py-3 text-left">Jilid</th>
-                      <th className="px-3 py-3 text-left">Halaman</th>
+                      <th className="px-3 py-3 text-left">Surat Pendek &amp; Doa Harian</th>
+                      <th className="px-3 py-3 text-left">Halaman Buku Prestasi Jilid</th>
                       <th className="px-3 py-3 text-left">Ust</th>
                       <th className="px-3 py-3 text-left">Paraf</th>
                       <th className="px-3 py-3 text-left">Keterangan</th>
@@ -597,6 +447,7 @@ export default function PrestasiSantriPage() {
                         </td>
                         <td className="table-cell">{item.tanggal ? new Date(item.tanggal).toLocaleDateString('id-ID') : '-'}</td>
                         <td className="table-cell">{item.jilid || item.santri?.jilid || '-'}</td>
+                        <td className="table-cell">{item.judul_prestasi || '-'}</td>
                         <td className="table-cell">{item.halaman || '-'}</td>
                         <td className="table-cell">{item.ust_nama || '-'}</td>
                         <td className="table-cell">{item.paraf || '-'}</td>

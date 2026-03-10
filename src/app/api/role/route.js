@@ -11,7 +11,7 @@ export const ROLES_DEFAULT = [
   { id: 1, nama_role: 'Pimpinan TPQ', level: 1, is_system: true, deskripsi: 'Pimpinan / Kepala TPQ – akses penuh', akses_default: null },
   { id: 2, nama_role: 'Sekretaris',   level: 2, is_system: true, deskripsi: 'Sekretaris – kelola santri & laporan', akses_default: ['dashboard','santri','tambah_santri','bayar','pembayaran_lain','laporan','jurnal','saran','notifikasi','prestasi_santri','export_database'] },
   { id: 3, nama_role: 'Bendahara',    level: 3, is_system: true, deskripsi: 'Bendahara – kelola keuangan',          akses_default: ['dashboard','santri','bayar','pembayaran_lain','infak','pengeluaran','dana','jurnal','laporan','pengaturan','notifikasi','prestasi_santri','export_database'] },
-  { id: 4, nama_role: 'Pengajar',     level: 4, is_system: true, deskripsi: 'Pengajar / Ustadz – akses terbatas',  akses_default: ['santri','prestasi_santri','saran','notifikasi','akun'] },
+  { id: 4, nama_role: 'Pengajar',     level: 4, is_system: true, deskripsi: 'Pengajar / Ustadz – akses terbatas',  akses_default: ['santri','prestasi_santri','laporan','saran','notifikasi','akun'] },
   { id: 5, nama_role: 'Lainnya',      level: 5, is_system: true, deskripsi: 'Role lainnya – akses terbatas',       akses_default: ['dashboard'] },
 ];
 

@@ -284,7 +284,7 @@ export async function GET(request) {
         break;
 
       case 'prestasi_santri': {
-        title = `Buku Prestasi Santri Tahun ${tahun}${jenisPrestasi === 'surat_doa' ? ' - Surat Pendek & Doa Harian' : jenisPrestasi === 'halaman' ? ' - Prestasi Halaman' : ''}`;
+        title = `Buku Prestasi Santri Tahun ${tahun}${jenisPrestasi === 'surat_doa' ? ' - Surat Pendek & Doa Harian' : jenisPrestasi === 'halaman' ? ' - Buku Prestasi Jilid' : ''}`;
         const startDatePrestasi = new Date(tahun, 0, 1);
         const endDatePrestasi = new Date(tahun, 11, 31, 23, 59, 59);
 

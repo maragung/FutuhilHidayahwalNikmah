@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { safeHexColor } from '@/lib/color';
 
 export default function LaporanPage() {
@@ -23,16 +23,27 @@ export default function LaporanPage() {
   const [tahunMulai, setTahunMulai] = useState(new Date().getFullYear());
   const [warnaSubsidi, setWarnaSubsidi] = useState('#045EB8');
   const [warnaNonSubsidi, setWarnaNonSubsidi] = useState('#04B816');
+  const [currentUser, setCurrentUser] = useState(null);
 
-  const tipeLaporan = [
-    { value: 'santri', label: 'Data Santri' },
-    { value: 'pembayaran', label: 'Laporan Pembayaran SPP' },
-    { value: 'status_pembayaran', label: 'Status Pembayaran Per Santri' },
-    { value: 'pembayaran_lain', label: 'Laporan Pembayaran Lain' },
-    { value: 'infak', label: 'Laporan Infak/Sedekah' },
-    { value: 'pengeluaran', label: 'Laporan Pengeluaran' },
-    { value: 'jurnal', label: 'Jurnal Kas' },
-  ];
+  const isPengajar = currentUser?.jabatan === 'Pengajar';
+
+  const tipeLaporan = useMemo(() => {
+    const prestasiOption = { value: 'prestasi_santri', label: 'Buku Prestasi Santri' };
+    if (isPengajar) {
+      return [prestasiOption];
+    }
+
+    return [
+      { value: 'santri', label: 'Data Santri' },
+      { value: 'pembayaran', label: 'Laporan Pembayaran SPP' },
+      { value: 'status_pembayaran', label: 'Status Pembayaran Per Santri' },
+      { value: 'pembayaran_lain', label: 'Laporan Pembayaran Lain' },
+      { value: 'infak', label: 'Laporan Infak/Sedekah' },
+      { value: 'pengeluaran', label: 'Laporan Pengeluaran' },
+      { value: 'jurnal', label: 'Jurnal Kas' },
+      prestasiOption,
+    ];
+  }, [isPengajar]);
 
   const namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
                     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -123,12 +134,32 @@ export default function LaporanPage() {
           { key: 'saldo', label: 'Saldo', format: 'currency' },
           { key: 'admin', label: 'Admin' },
         ];
+      case 'prestasi_santri':
+        return [
+          { key: 'nama_santri', label: 'Nama Santri' },
+          { key: 'no_absen', label: 'No. Absen' },
+          { key: 'tanggal', label: 'Tanggal', format: 'date' },
+          { key: 'jilid', label: 'Jilid' },
+          { key: 'surat_doa', label: 'Surat Pendek / Doa Harian' },
+          { key: 'halaman', label: 'Halaman Buku Prestasi Jilid' },
+          { key: 'ust', label: 'Ust' },
+          { key: 'paraf', label: 'Paraf' },
+          { key: 'keterangan', label: 'Keterangan' },
+        ];
       default:
         return [];
     }
   };
 
   useEffect(() => {
+    try {
+      const adminData = JSON.parse(localStorage.getItem('admin_data') || 'null');
+      setCurrentUser(adminData);
+      if (adminData?.jabatan === 'Pengajar') {
+        setFilter((prev) => ({ ...prev, tipe: 'prestasi_santri' }));
+      }
+    } catch {}
+
     const fetchKegiatan = async () => {
       const token = localStorage.getItem('auth_token');
       try {
@@ -247,18 +278,21 @@ export default function LaporanPage() {
     setSuccess('');
 
     const token = localStorage.getItem('auth_token');
+    const tipeAktif = isPengajar ? 'prestasi_santri' : filter.tipe;
     
     try {
-      let url = `/api/export?tipe=${filter.tipe}&tahun=${filter.tahun}`;
+      let url = `/api/export?tipe=${tipeAktif}&tahun=${filter.tahun}`;
       if (filter.bulan) url += `&bulan=${filter.bulan}`;
-      if (filter.tipe === 'pembayaran_lain' && filter.kegiatan_id) url += `&kegiatan_id=${filter.kegiatan_id}`;
-      if ((filter.tipe === 'santri' || filter.tipe === 'status_pembayaran') && filter.filter_kategori) {
+      if (tipeAktif === 'pembayaran_lain' && filter.kegiatan_id) url += `&kegiatan_id=${filter.kegiatan_id}`;
+      if ((tipeAktif === 'santri' || tipeAktif === 'status_pembayaran') && filter.filter_kategori) {
         url += `&filter_kategori=${filter.filter_kategori}`;
         if (filter.filter_kategori === 'jilid' && filter.filter_jilid) url += `&filter_jilid=${encodeURIComponent(filter.filter_jilid)}`;
       }
-      url += `&include_nik=${filter.include_nik}`;
-      url += `&include_email=${filter.include_email}`;
-      url += `&include_phone=${filter.include_phone}`;
+      if (tipeAktif !== 'prestasi_santri') {
+        url += `&include_nik=${filter.include_nik}`;
+        url += `&include_email=${filter.include_email}`;
+        url += `&include_phone=${filter.include_phone}`;
+      }
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -276,8 +310,8 @@ export default function LaporanPage() {
         return;
       }
 
-      const headers = getHeaders(filter.tipe, filter);
-      const tipeLabel = tipeLaporan.find(t => t.value === filter.tipe)?.label || 'Laporan';
+      const headers = getHeaders(tipeAktif, filter);
+      const tipeLabel = tipeLaporan.find(t => t.value === tipeAktif)?.label || 'Laporan';
       const fileName = `${tipeLabel} ${filter.tahun}${filter.bulan ? ' ' + namaBulan[parseInt(filter.bulan) - 1] : ''}`;
 
       if (filter.format === 'excel') {
@@ -301,6 +335,12 @@ export default function LaporanPage() {
         <h1 className="text-2xl font-bold text-gray-800">Laporan & Export</h1>
         <p className="text-gray-500">Ekspor data ke PDF atau Excel</p>
       </div>
+
+      {isPengajar && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
+          Mode Pengajar aktif. Halaman ini hanya menampilkan dan mengekspor data <strong>Buku Prestasi Santri</strong>.
+        </div>
+      )}
 
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -373,7 +413,7 @@ export default function LaporanPage() {
               </div>
             </div>
 
-            {filter.tipe === 'pembayaran_lain' && (
+            {filter.tipe === 'pembayaran_lain' && !isPengajar && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nama Kegiatan</label>
                 <select
@@ -389,7 +429,7 @@ export default function LaporanPage() {
               </div>
             )}
 
-            {(filter.tipe === 'santri' || filter.tipe === 'status_pembayaran') && (
+            {(filter.tipe === 'santri' || filter.tipe === 'status_pembayaran') && !isPengajar && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Filter Kategori</label>
                 <div className="flex flex-wrap gap-2">
@@ -426,6 +466,7 @@ export default function LaporanPage() {
               </div>
             )}
 
+            {!isPengajar && filter.tipe !== 'prestasi_santri' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Field Sensitif</label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -455,6 +496,7 @@ export default function LaporanPage() {
                 </label>
               </div>
             </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -520,6 +562,8 @@ export default function LaporanPage() {
           <div className="card">
             <h3 className="font-semibold text-gray-800 mb-3">Deskripsi Laporan</h3>
             <div className="space-y-3">
+              {!isPengajar && (
+                <>
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm font-medium text-blue-900">Data Santri</p>
                 <p className="text-xs text-blue-700 mt-1">
@@ -559,6 +603,15 @@ export default function LaporanPage() {
                 <p className="text-sm font-medium text-gray-900">Jurnal Kas</p>
                 <p className="text-xs text-gray-700 mt-1">
                   Catatan lengkap semua transaksi masuk dan keluar dengan saldo berjalan
+                </p>
+              </div>
+                </>
+              )}
+
+              <div className="p-3 bg-emerald-50 rounded-lg">
+                <p className="text-sm font-medium text-emerald-900">Buku Prestasi Santri</p>
+                <p className="text-xs text-emerald-700 mt-1">
+                  Rekap Surat Pendek, Doa Harian, dan Halaman Buku Prestasi Jilid santri.
                 </p>
               </div>
             </div>
