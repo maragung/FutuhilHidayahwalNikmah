@@ -4,6 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 
+const PENGAJAR_ALLOWED_PATHS = [
+  '/admin/prestasi-santri',
+  '/admin/santri',
+  '/admin/saran',
+  '/admin/notifikasi',
+  '/admin/akun',
+];
+
 export default function AdminLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -39,6 +47,15 @@ export default function AdminLayout({ children }) {
     }
   }, [router, pathname]);
 
+  useEffect(() => {
+    if (loading || pathname === '/admin/login' || !user) return;
+
+    if (user.jabatan === 'Pengajar') {
+      const allowed = PENGAJAR_ALLOWED_PATHS.some((item) => pathname === item || pathname.startsWith(`${item}/`));
+      if (!allowed) router.push('/admin/prestasi-santri');
+    }
+  }, [loading, pathname, router, user]);
+
   // Render halaman login tanpa chrome admin (sidebar/topbar)
   if (pathname === '/admin/login') {
     return children;
@@ -55,22 +72,31 @@ export default function AdminLayout({ children }) {
     router.push('/admin/login');
   };
 
-  const menuItems = [
-    { href: '/admin/dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-    { href: '/admin/santri', label: 'Data Santri', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-    { href: '/admin/santri/tambah', label: 'Pendaftaran Santri', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' },
-    { href: '/admin/bayar', label: 'Bayar SPP', icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
-    { href: '/admin/pembayaran-lain', label: 'Pembayaran Lain', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-    { href: '/admin/infak', label: 'Infak/Sedekah', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' },
-    { href: '/admin/pengeluaran', label: 'Pengeluaran', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-    { href: '/admin/dana', label: 'Keuangan', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-    { href: '/admin/jurnal', label: 'Jurnal Kas', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-    { href: '/admin/saran', label: 'Kotak Saran', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z' },
-    { href: '/admin/laporan', label: 'Laporan/Export', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-    { href: '/admin/akun', label: 'Akun', icon: 'M5.121 17.804A8.966 8.966 0 0112 15c2.03 0 3.904.672 5.412 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z' },
-    { href: '/admin/notifikasi', label: 'Notifikasi', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
-    { href: '/admin/alumni', label: 'Alumni / Lulus', icon: 'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222' },
-  ];
+  const menuItems = user?.jabatan === 'Pengajar'
+    ? [
+        { href: '/admin/prestasi-santri', label: 'Buku Prestasi', icon: 'M12 6.253v13m0-13C10.832 5.483 8.99 5 7 5c-1.99 0-3.832.483-5 1.253v13C3.168 18.483 5.01 18 7 18c1.99 0 3.832.483 5 1.253m0-13C13.168 5.483 15.01 5 17 5c1.99 0 3.832.483 5 1.253v13C20.832 18.483 18.99 18 17 18c-1.99 0-3.832.483-5 1.253' },
+        { href: '/admin/santri', label: 'Data Santri', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+        { href: '/admin/saran', label: 'Kotak Saran', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z' },
+        { href: '/admin/notifikasi', label: 'Notifikasi', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
+        { href: '/admin/akun', label: 'Akun', icon: 'M5.121 17.804A8.966 8.966 0 0112 15c2.03 0 3.904.672 5.412 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z' },
+      ]
+    : [
+        { href: '/admin/dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+        { href: '/admin/prestasi-santri', label: 'Buku Prestasi', icon: 'M12 6.253v13m0-13C10.832 5.483 8.99 5 7 5c-1.99 0-3.832.483-5 1.253v13C3.168 18.483 5.01 18 7 18c1.99 0 3.832.483 5 1.253m0-13C13.168 5.483 15.01 5 17 5c1.99 0 3.832.483 5 1.253v13C20.832 18.483 18.99 18 17 18c-1.99 0-3.832.483-5 1.253' },
+        { href: '/admin/santri', label: 'Data Santri', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+        { href: '/admin/santri/tambah', label: 'Pendaftaran Santri', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' },
+        { href: '/admin/bayar', label: 'Bayar SPP', icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
+        { href: '/admin/pembayaran-lain', label: 'Pembayaran Lain', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+        { href: '/admin/infak', label: 'Infak/Sedekah', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' },
+        { href: '/admin/pengeluaran', label: 'Pengeluaran', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+        { href: '/admin/dana', label: 'Keuangan', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+        { href: '/admin/jurnal', label: 'Jurnal Kas', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+        { href: '/admin/saran', label: 'Kotak Saran', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z' },
+        { href: '/admin/laporan', label: 'Laporan/Export', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+        { href: '/admin/akun', label: 'Akun', icon: 'M5.121 17.804A8.966 8.966 0 0112 15c2.03 0 3.904.672 5.412 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z' },
+        { href: '/admin/notifikasi', label: 'Notifikasi', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
+        { href: '/admin/alumni', label: 'Alumni / Lulus', icon: 'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222' },
+      ];
 
   // Menu khusus Pimpinan TPQ, Bendahara & Developer
   if (user?.jabatan === 'Developer' || user?.jabatan === 'Pimpinan TPQ' || user?.jabatan === 'Bendahara') {
@@ -93,6 +119,7 @@ export default function AdminLayout({ children }) {
   // Urutan menu tetap sesuai konfigurasi
   const MENU_ORDER = [
     '/admin/dashboard',
+    '/admin/prestasi-santri',
     '/admin/bayar',
     '/admin/santri',
     '/admin/alumni',

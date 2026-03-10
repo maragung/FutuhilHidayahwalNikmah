@@ -125,6 +125,7 @@ export default function ManageAdminPage() {
   
   const menuAkses = [
     { key: 'dashboard', label: 'Dashboard' },
+    { key: 'prestasi_santri', label: 'Buku Prestasi Santri' },
     { key: 'santri', label: 'Data Santri' },
     { key: 'tambah_santri', label: 'Pendaftaran Santri' },
     { key: 'bayar', label: 'Bayar SPP' },
@@ -134,6 +135,8 @@ export default function ManageAdminPage() {
     { key: 'dana', label: 'Keuangan' },
     { key: 'jurnal', label: 'Jurnal Kas' },
     { key: 'saran', label: 'Kotak Saran' },
+    { key: 'notifikasi', label: 'Notifikasi' },
+    { key: 'akun', label: 'Akun' },
     { key: 'laporan', label: 'Laporan/Export' },
     { key: 'pengaturan', label: 'Pengaturan' },
   ];

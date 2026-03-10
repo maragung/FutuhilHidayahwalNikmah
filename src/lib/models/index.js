@@ -15,6 +15,7 @@ const Log = require('./Log');
 const Absensi = require('./Absensi');
 const EmailServer = require('./EmailServer');
 const EmailLog = require('./EmailLog');
+const BukuPrestasiSantri = require('./BukuPrestasiSantri');
 
 // Relasi Role
 Role.hasMany(Admin, { foreignKey: 'role_id', as: 'admins' });
@@ -68,6 +69,12 @@ Admin.hasMany(Absensi, { foreignKey: 'admin_id', as: 'absensiDicatat' });
 Absensi.belongsTo(Santri, { foreignKey: 'santri_id', as: 'santri' });
 Absensi.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
 
+// Relasi Buku Prestasi Santri
+Santri.hasMany(BukuPrestasiSantri, { foreignKey: 'santri_id', as: 'prestasiSantri' });
+Admin.hasMany(BukuPrestasiSantri, { foreignKey: 'admin_id', as: 'prestasiSantri' });
+BukuPrestasiSantri.belongsTo(Santri, { foreignKey: 'santri_id', as: 'santri' });
+BukuPrestasiSantri.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
+
 // Relasi EmailLog → EmailServer
 EmailServer.hasMany(EmailLog, { foreignKey: 'email_server_id', as: 'logs' });
 EmailLog.belongsTo(EmailServer, { foreignKey: 'email_server_id', as: 'server' });
@@ -90,4 +97,5 @@ module.exports = {
   Absensi,
   EmailServer,
   EmailLog,
+  BukuPrestasiSantri,
 };

@@ -96,6 +96,26 @@ export async function PUT(request, { params }) {
       );
     }
 
+    if (auth.user.jabatan === 'Pengajar') {
+      const allowedPengajarFields = ['jilid'];
+      const attemptedFields = Object.keys(updateData).filter((key) => updateData[key] !== undefined);
+
+      if (attemptedFields.length === 0) {
+        return NextResponse.json(
+          { success: false, pesan: 'Tidak ada perubahan yang dikirim' },
+          { status: 400 }
+        );
+      }
+
+      const invalidFields = attemptedFields.filter((key) => !allowedPengajarFields.includes(key));
+      if (invalidFields.length > 0) {
+        return NextResponse.json(
+          { success: false, pesan: 'Pengajar hanya dapat mengubah jilid santri' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Handle perubahan status_aktif
     if (updateData.status_aktif !== undefined) {
       if (!ROLE_BISA_KELOLA_STATUS.includes(auth.user.jabatan)) {

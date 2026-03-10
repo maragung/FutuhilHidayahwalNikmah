@@ -6,7 +6,7 @@ import { Op } from 'sequelize';
 import { createBackup } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
-const ROLE_BISA_KELOLA_SANTRI = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
+const ROLE_BISA_KELOLA_SANTRI = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'];
 const JENIS_KELAMIN_OPTIONS = ['Laki-laki', 'Perempuan'];
 // GET - Ambil semua santri (auth required)
 export async function GET(request) {

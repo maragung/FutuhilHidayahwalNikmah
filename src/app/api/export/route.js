@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Santri, PembayaranSPP, InfakSedekah, Pengeluaran, JurnalKas, Admin, PembayaranLain, Kegiatan } from '@/lib/models';
+import { Santri, PembayaranSPP, InfakSedekah, Pengeluaran, JurnalKas, Admin, PembayaranLain, Kegiatan, BukuPrestasiSantri } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 
@@ -22,6 +22,7 @@ export async function GET(request) {
     const tahun = parseInt(searchParams.get('tahun')) || new Date().getFullYear();
     const bulan = searchParams.get('bulan');
     const kegiatanId = searchParams.get('kegiatan_id');
+    const jenisPrestasi = searchParams.get('jenis_prestasi') || '';
     const includeNik = searchParams.get('include_nik') !== 'false';
     const includeEmail = searchParams.get('include_email') !== 'false';
     const includePhone = searchParams.get('include_phone') !== 'false';
@@ -281,6 +282,46 @@ export async function GET(request) {
           admin: j.admin?.nama_lengkap,
         }));
         break;
+
+      case 'prestasi_santri': {
+        title = `Buku Prestasi Santri Tahun ${tahun}${jenisPrestasi === 'surat_doa' ? ' - Surat Pendek & Doa Harian' : jenisPrestasi === 'halaman' ? ' - Prestasi Halaman' : ''}`;
+        const startDatePrestasi = new Date(tahun, 0, 1);
+        const endDatePrestasi = new Date(tahun, 11, 31, 23, 59, 59);
+
+        const wherePrestasi = { tanggal: { [Op.between]: [startDatePrestasi, endDatePrestasi] } };
+        if (jenisPrestasi) wherePrestasi.jenis_prestasi = jenisPrestasi;
+        if (bulan) {
+          wherePrestasi.tanggal = {
+            [Op.between]: [
+              new Date(tahun, parseInt(bulan, 10) - 1, 1),
+              new Date(tahun, parseInt(bulan, 10), 0, 23, 59, 59),
+            ],
+          };
+        }
+
+        data = await BukuPrestasiSantri.findAll({
+          where: wherePrestasi,
+          include: [
+            { model: Santri, as: 'santri', attributes: ['nama_lengkap', 'no_absen', 'jilid'] },
+            { model: Admin, as: 'admin', attributes: ['nama_lengkap'] },
+          ],
+          order: [['tanggal', 'ASC'], ['id', 'ASC']],
+        });
+
+        data = data.map((item) => ({
+          nama_santri: item.santri?.nama_lengkap,
+          no_absen: item.santri?.no_absen,
+          tanggal: item.tanggal,
+          jilid: item.jilid || item.santri?.jilid,
+          jenis_prestasi: item.jenis_prestasi,
+          surat_doa: item.judul_prestasi,
+          halaman: item.halaman,
+          ust: item.ust_nama || item.admin?.nama_lengkap,
+          paraf: item.paraf,
+          keterangan: item.keterangan,
+        }));
+        break;
+      }
         
       default:
         return NextResponse.json(
