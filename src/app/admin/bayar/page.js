@@ -420,22 +420,6 @@ function BayarPageInner() {
                 </div>
               </div>
 
-              {/* Legenda */}
-              <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-3">
-                {[
-                  ['bg-green-100 border-green-300', 'Lunas (klik = detail)'],
-                  ['bg-blue-500 border-blue-600', 'Dipilih'],
-                  ['bg-white border-gray-300', 'Bisa dipilih'],
-                  ['bg-gray-50 border-gray-200', 'Terkunci'],
-                  ['bg-purple-50 border-purple-200', 'Blm terdaftar'],
-                  ['bg-orange-50 border-orange-200', 'Nonaktif'],
-                ].map(([cls, label]) => (
-                  <span key={label} className="flex items-center gap-1">
-                    <span className={`w-3 h-3 rounded border-2 ${cls}`}></span> {label}
-                  </span>
-                ))}
-              </div>
-
               {/* Grid bulan */}
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-5">
                 {namaBulan.map((nama, index) => {
@@ -527,13 +511,6 @@ function BayarPageInner() {
                     </div>
                   );
                 })}
-              </div>
-
-              {/* Petunjuk */}
-              <div className="mb-4 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
-                <p>📅 Pembayaran wajib <strong>berurutan</strong> dari bulan yang belum lunas pertama.</p>
-                <p>🟣 Bulan <strong>ungu</strong> = sebelum tanggal daftar (tidak wajib dibayar).</p>
-                <p>✅ Klik bulan <strong>hijau</strong> untuk melihat detail pembayaran atau membatalkannya.</p>
               </div>
 
               {/* Nominal & Metode */}

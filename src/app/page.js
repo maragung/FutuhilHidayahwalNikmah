@@ -185,7 +185,7 @@ export default function Home() {
                   type="text"
                   value={captchaValue}
                   onChange={(e) => setCaptchaValue(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                  placeholder="Masukkan 6 karakter captcha"
+                  placeholder="Ketik kode yang tertera di gambar"
                   maxLength={6}
                   className="input-field uppercase"
                   required
