@@ -7,6 +7,7 @@ import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 const ROLE_BISA_KELOLA_STATUS = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
 const ROLE_BISA_EDIT_SANTRI   = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara', 'Pengajar'];
+const JENIS_KELAMIN_OPTIONS = ['Laki-laki', 'Perempuan'];
 
 // GET - Ambil santri berdasarkan ID (auth required)
 export async function GET(request, { params }) {
@@ -133,6 +134,15 @@ export async function PUT(request, { params }) {
     // Normalisasi no_absen
     if ('no_absen' in updateData) {
       updateData.no_absen = updateData.no_absen ? parseInt(updateData.no_absen) : null;
+    }
+
+    if ('jenis_kelamin' in updateData && updateData.jenis_kelamin) {
+      if (!JENIS_KELAMIN_OPTIONS.includes(updateData.jenis_kelamin)) {
+        return NextResponse.json(
+          { success: false, pesan: 'Jenis kelamin tidak valid' },
+          { status: 400 }
+        );
+      }
     }
 
     await santri.update(updateData);

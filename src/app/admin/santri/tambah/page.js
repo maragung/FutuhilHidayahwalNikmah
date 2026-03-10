@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 const JILID_OPTIONS = ['Pra TK','Jilid 1','Jilid 2','Jilid 3','Jilid 4','Jilid 5','Jilid 6','Gharib','Tajwid','Al-Quran'];
+const JENIS_KELAMIN_OPTIONS = ['Laki-laki', 'Perempuan'];
 
 function SantriForm() {
   const router = useRouter();
@@ -22,6 +23,7 @@ function SantriForm() {
     no_absen: '',
     nik: '',
     nama_lengkap: '',
+    jenis_kelamin: '',
     jilid: 'Jilid 1',
     alamat: '',
     nama_wali: '',
@@ -43,6 +45,7 @@ function SantriForm() {
             no_absen: s.no_absen ?? '',
             nik: s.nik || '',
             nama_lengkap: s.nama_lengkap || '',
+            jenis_kelamin: s.jenis_kelamin || '',
             jilid: s.jilid || 'Jilid 1',
             alamat: s.alamat || '',
             nama_wali: s.nama_wali || '',
@@ -73,6 +76,10 @@ function SantriForm() {
     }
     if (!formData.nama_lengkap.trim()) {
       setError('Nama lengkap harus diisi');
+      return;
+    }
+    if (!formData.jenis_kelamin) {
+      setError('Jenis kelamin wajib dipilih');
       return;
     }
     setShowPinModal(true);
@@ -197,12 +204,21 @@ function SantriForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Jenis Kelamin <span className="text-red-500">*</span>
+              </label>
+              <select name="jenis_kelamin" value={formData.jenis_kelamin} onChange={handleChange} className="input-field" required>
+                <option value="">Pilih jenis kelamin</option>
+                {JENIS_KELAMIN_OPTIONS.map(jk => <option key={jk} value={jk}>{jk}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Jilid / Kelas</label>
               <select name="jilid" value={formData.jilid} onChange={handleChange} className="input-field">
                 {JILID_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
               </select>
             </div>
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mendaftar</label>
               <input type="date" name="tgl_mendaftar" value={formData.tgl_mendaftar} onChange={handleChange} className="input-field" />
             </div>
