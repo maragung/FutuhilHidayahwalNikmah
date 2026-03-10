@@ -370,7 +370,7 @@ export default function DaftarSantriPage() {
                   {namaBulan.map((b, i) => (
                     <th key={i} className="px-2 py-3 text-center">{b}</th>
                   ))}
-                  <th className="px-3 py-3 text-center">Dibayar</th>
+                  <th className="px-3 py-3 text-center">Terlunasi</th>
                   <th className="px-3 py-3 text-center">Total</th>
                 </tr>
               </thead>
@@ -494,7 +494,7 @@ export default function DaftarSantriPage() {
                 <p className="font-medium">{new Date(detailSantri.tgl_mendaftar).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
               </div>
               <div className="bg-gray-50 rounded p-3">
-                <p className="text-xs text-gray-500">Dibayar Total</p>
+                <p className="text-xs text-gray-500">Terlunasi</p>
                 <p className="font-medium">{detailSantri.bulan_dibayar_total || 0}/{detailSantri.bulan_sejak_daftar_sampai_kini || 0} bulan</p>
               </div>
               <div className="bg-gray-50 rounded p-3">
