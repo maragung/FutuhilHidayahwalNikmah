@@ -10,7 +10,8 @@
     "lint": "next lint",
     "db:migrate": "node src/lib/migrate.js",
     "db:seed": "node src/lib/seed.js",
-    "db:check": "node src/lib/db-check.js"
+    "db:check": "node src/lib/db-check.js",
+    "db:repair:spp-dates": "node src/lib/repair-spp-transaction-dates.js"
   },
   "engines": {
   "node": ">=20 <=24"

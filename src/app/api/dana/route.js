@@ -4,6 +4,14 @@ import { JurnalKas, PembayaranSPP, InfakSedekah, Pengeluaran } from '@/lib/model
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 
+const NON_SPP_JURNAL_WHERE = {
+  [Op.and]: [
+    { referensi_kode: { [Op.notLike]: 'SPP-%' } },
+    { referensi_kode: { [Op.notLike]: 'ADJ-SPP-%' } },
+    { referensi_kode: { [Op.notLike]: 'REV-SPP-%' } },
+  ],
+};
+
 // GET - Ringkasan dana
 export async function GET(request) {
   try {
@@ -27,6 +35,14 @@ export async function GET(request) {
     const totalSPP = await PembayaranSPP.sum('nominal', {
       where: { tahun_spp: tahun },
     }) || 0;
+
+    const totalPemasukanNonSPPJurnalTahun = await JurnalKas.sum('nominal', {
+      where: {
+        jenis: 'Masuk',
+        tgl_transaksi: { [Op.between]: [startDate, endDate] },
+        ...NON_SPP_JURNAL_WHERE,
+      },
+    }) || 0;
     
     // Total Infak tahun ini
     const totalInfak = await InfakSedekah.sum('nominal', {
@@ -38,13 +54,10 @@ export async function GET(request) {
       where: { tgl_keluar: { [Op.between]: [startDate, endDate] } },
     }) || 0;
 
-    // Total pemasukan & pengeluaran tahun ini berdasarkan JurnalKas (sumber saldo utama)
-    const totalPemasukanJurnalTahun = await JurnalKas.sum('nominal', {
-      where: {
-        jenis: 'Masuk',
-        tgl_transaksi: { [Op.between]: [startDate, endDate] },
-      },
-    }) || 0;
+    // Total pemasukan tahun ini:
+    // - SPP dihitung berdasarkan periode SPP (bulan_spp/tahun_spp), bukan tanggal input.
+    // - Pemasukan non-SPP tetap mengikuti jurnal kas sebagai sumber saldo utama.
+    const totalPemasukanTahun = totalSPP + totalPemasukanNonSPPJurnalTahun;
 
     const totalPengeluaranJurnalTahun = await JurnalKas.sum('nominal', {
       where: {
@@ -90,10 +103,11 @@ export async function GET(request) {
       const bulanStart = new Date(tahun, bulan - 1, 1);
       const bulanEnd = new Date(tahun, bulan, 0, 23, 59, 59);
 
-      const pemasukanJurnalBulan = await JurnalKas.sum('nominal', {
+      const pemasukanNonSPPJurnalBulan = await JurnalKas.sum('nominal', {
         where: {
           jenis: 'Masuk',
           tgl_transaksi: { [Op.between]: [bulanStart, bulanEnd] },
+          ...NON_SPP_JURNAL_WHERE,
         },
       }) || 0;
 
@@ -124,9 +138,9 @@ export async function GET(request) {
         spp: sppBulan,
         infak: infakBulan,
         pengeluaran: pengeluaranBulan,
-        pemasukan_jurnal: pemasukanJurnalBulan,
+        pemasukan_jurnal: pemasukanNonSPPJurnalBulan + sppBulan,
         pengeluaran_jurnal: pengeluaranJurnalBulan,
-        netto: pemasukanJurnalBulan - pengeluaranJurnalBulan,
+        netto: (pemasukanNonSPPJurnalBulan + sppBulan) - pengeluaranJurnalBulan,
       });
     }
     
@@ -137,12 +151,12 @@ export async function GET(request) {
         saldo_akhir: saldoAkhir,
         saldo_verifikasi: saldoVerifikasi,
         is_consistent: isConsistent,
-        total_pemasukan_tahun: totalPemasukanJurnalTahun,
+        total_pemasukan_tahun: totalPemasukanTahun,
         total_spp_tahun: totalSPP,
         total_infak_tahun: totalInfak,
         total_pengeluaran_tahun: totalPengeluaranJurnalTahun,
         total_pengeluaran_manual_tahun: totalPengeluaran,
-        netto_tahun: totalPemasukanJurnalTahun - totalPengeluaranJurnalTahun,
+        netto_tahun: totalPemasukanTahun - totalPengeluaranJurnalTahun,
         pengeluaran_per_kategori: pengeluaranPerKategori,
         ringkasan_bulanan: ringkasanBulanan,
       },

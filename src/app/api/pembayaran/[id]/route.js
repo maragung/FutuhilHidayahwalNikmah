@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { PembayaranSPP, Santri, Admin, JurnalKas } from '@/lib/models';
 import sequelize from '@/lib/db';
-import { createBackup } from '@/lib/utils';
+import { createBackup, resolveSppTransactionDate } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 async function verifyPin(authUserId, pin) {
@@ -68,9 +68,12 @@ export async function PUT(request, { params }) {
       tahun_spp: body.tahun_spp ? Number(body.tahun_spp) : pembayaran.tahun_spp,
     };
 
+    updateData.tgl_bayar = resolveSppTransactionDate(updateData.tahun_spp, updateData.bulan_spp);
+
     await pembayaran.update(updateData, { transaction: t });
 
     await JurnalKas.update({
+      tgl_transaksi: updateData.tgl_bayar,
       nominal: updateData.nominal,
       keterangan: `SPP ${pembayaran.santri_id} - Bulan ${updateData.bulan_spp}/${updateData.tahun_spp}`,
     }, {
@@ -83,7 +86,7 @@ export async function PUT(request, { params }) {
       const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
       const saldoTerakhir = lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0;
       await JurnalKas.create({
-        tgl_transaksi: new Date(),
+        tgl_transaksi: updateData.tgl_bayar,
         jenis: selisih > 0 ? 'Masuk' : 'Keluar',
         nominal: Math.abs(selisih),
         referensi_kode: `ADJ-${pembayaran.kode_invoice}`,
@@ -144,12 +147,13 @@ export async function DELETE(request, { params }) {
     }
 
     const dataSebelum = pembayaran.toJSON();
+    const tanggalTransaksi = pembayaran.tgl_bayar || resolveSppTransactionDate(pembayaran.tahun_spp, pembayaran.bulan_spp);
 
     const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
     const saldoTerakhir = lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0;
 
     await JurnalKas.create({
-      tgl_transaksi: new Date(),
+      tgl_transaksi: tanggalTransaksi,
       jenis: 'Keluar',
       nominal: Number(pembayaran.nominal),
       referensi_kode: `REV-${pembayaran.kode_invoice}`,
