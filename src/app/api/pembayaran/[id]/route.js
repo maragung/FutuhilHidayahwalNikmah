@@ -74,7 +74,6 @@ export async function PUT(request, { params }) {
 
     await JurnalKas.update({
       tgl_transaksi: updateData.tgl_bayar,
-      nominal: updateData.nominal,
       keterangan: `SPP ${pembayaran.santri_id} - Bulan ${updateData.bulan_spp}/${updateData.tahun_spp}`,
     }, {
       where: { referensi_kode: pembayaran.kode_invoice },

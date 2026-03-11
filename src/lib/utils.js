@@ -50,7 +50,7 @@ export function resolveSppTransactionDate(tahunSpp, bulanSpp, fallbackDate = new
   const bulan = Number(bulanSpp);
 
   if (!Number.isInteger(tahun) || !Number.isInteger(bulan) || bulan < 1 || bulan > 12) {
-    return fallbackDate;
+    return new Date(fallbackDate);
   }
 
   const fallback = new Date(fallbackDate);
