@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { SkeletonTable } from '@/components/SkeletonLoader';
+import { createIdempotencyKey } from '@/lib/client-idempotency';
 
 export default function InfakPage() {
   const [loading, setLoading] = useState(false);
@@ -94,7 +95,8 @@ export default function InfakPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'x-idempotency-key': createIdempotencyKey('infak')
         },
         body: JSON.stringify({
           nama_donatur: formData.nama_donatur,

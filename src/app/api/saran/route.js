@@ -3,6 +3,10 @@ import { verifyAuth } from '@/lib/auth';
 import { Saran, Admin } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { kirimEmailSaranBaru } from '@/lib/email';
+import { Op } from 'sequelize';
+import { verifyCaptchaPayload } from '@/lib/captcha';
+import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
+import { ValidationError, isValidEmail, isValidPhone, readEnumValue, readOptionalText, readRequiredText } from '@/lib/request-validation';
 
 // GET - Ambil semua saran (butuh auth admin)
 export async function GET(request) {
@@ -63,34 +67,75 @@ export async function GET(request) {
 
 // POST - Submit saran baru (public, tidak perlu auth)
 export async function POST(request) {
+  let guard;
   try {
     await sequelize.authenticate();
 
     const body = await request.json();
-    const { nama_pengirim, email_pengirim, no_telp_pengirim, kategori, isi_saran } = body;
+    const { nama_pengirim, email_pengirim, no_telp_pengirim, kategori, isi_saran, captcha_token, captcha_answer } = body;
+    const namaPengirim = readRequiredText(nama_pengirim, 'Nama', { max: 100 });
+    const isiSaran = readRequiredText(isi_saran, 'Isi saran', { min: 10, max: 3000 });
+    const kategoriValue = readEnumValue(kategori, 'Kategori', ['Saran', 'Kritik', 'Pertanyaan', 'Lainnya'], 'Saran');
+    const emailPengirim = readOptionalText(email_pengirim, { max: 100 });
+    const teleponPengirim = readOptionalText(no_telp_pengirim, { max: 20 });
 
-    // Validasi
-    if (!nama_pengirim || !isi_saran) {
-      return NextResponse.json(
-        { success: false, pesan: 'Nama dan isi saran harus diisi' },
-        { status: 400 }
-      );
+    if (emailPengirim && !isValidEmail(emailPengirim)) {
+      throw new ValidationError('Email pengirim tidak valid');
+    }
+    if (teleponPengirim && !isValidPhone(teleponPengirim)) {
+      throw new ValidationError('Nomor telepon pengirim tidak valid');
     }
 
-    if (isi_saran.length < 10) {
-      return NextResponse.json(
-        { success: false, pesan: 'Isi saran minimal 10 karakter' },
-        { status: 400 }
-      );
+    const guardResult = await claimIdempotency({
+      request,
+      route: '/api/saran',
+      actorScope: 'public',
+      ttlMs: 60 * 60 * 1000,
+      payload: {
+        nama_pengirim: namaPengirim,
+        email_pengirim: emailPengirim,
+        no_telp_pengirim: teleponPengirim,
+        kategori: kategoriValue,
+        isi_saran: isiSaran,
+      },
+    });
+    if (!guardResult.success) {
+      return guardResult.response;
+    }
+    guard = guardResult.guard;
+
+    const captchaCheck = verifyCaptchaPayload(captcha_token, captcha_answer);
+    if (!captchaCheck.valid) {
+      return respondWithGuard(guard, { success: false, pesan: captchaCheck.message }, 400);
+    }
+
+    const recentDuplicate = await Saran.findOne({
+      where: {
+        nama_pengirim: namaPengirim,
+        email_pengirim: emailPengirim,
+        no_telp_pengirim: teleponPengirim,
+        kategori: kategoriValue,
+        isi_saran: isiSaran,
+        created_at: { [Op.gte]: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+      order: [['id', 'DESC']],
+    });
+    if (recentDuplicate) {
+      await logDuplicateAttempt('Saran duplikat ditolak', {
+        nama_pengirim: namaPengirim,
+        kategori: kategoriValue,
+        recent_id: recentDuplicate.id,
+      });
+      return respondWithGuard(guard, { success: false, pesan: 'Saran yang sama sudah pernah dikirim baru-baru ini.' }, 409);
     }
 
     // Simpan saran
     const saran = await Saran.create({
-      nama_pengirim,
-      email_pengirim: email_pengirim || null,
-      no_telp_pengirim: no_telp_pengirim || null,
-      kategori: kategori || 'Saran',
-      isi_saran,
+      nama_pengirim: namaPengirim,
+      email_pengirim: emailPengirim,
+      no_telp_pengirim: teleponPengirim,
+      kategori: kategoriValue,
+      isi_saran: isiSaran,
       status: 'Belum Dibaca',
     });
 
@@ -111,12 +156,18 @@ export async function POST(request) {
       // Tetap return sukses meski email gagal
     }
 
-    return NextResponse.json({
+    return respondWithGuard(guard, {
       success: true,
       pesan: 'Terima kasih! Saran Anda telah kami terima dan akan segera ditindaklanjuti.',
       data: saran,
-    });
+    }, 201);
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return guard
+        ? respondWithGuard(guard, { success: false, pesan: error.message }, 400)
+        : NextResponse.json({ success: false, pesan: error.message }, { status: 400 });
+    }
+    await releaseGuard(guard);
     console.error('Error POST saran:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },

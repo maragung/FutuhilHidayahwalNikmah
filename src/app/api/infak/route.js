@@ -5,6 +5,8 @@ import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 import { createBackup, generateKodeInvoice } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
+import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
+import { ValidationError, readDateValue, readOptionalText, readPositiveAmount, readRequiredText } from '@/lib/request-validation';
 
 // GET - Ambil semua infak/sedekah
 export async function GET(request) {
@@ -69,6 +71,7 @@ export async function GET(request) {
 // POST - Tambah infak/sedekah
 export async function POST(request) {
   let t;
+  let guard;
   
   try {
     await sequelize.authenticate();
@@ -83,6 +86,28 @@ export async function POST(request) {
     
     const body = await request.json();
     const { nama_donatur, nominal, catatan, tgl_terima, pin } = body;
+    const namaDonatur = readRequiredText(nama_donatur, 'Nama donatur', { max: 100 });
+    const nominalValue = readPositiveAmount(nominal, 'Nominal');
+    const catatanText = readOptionalText(catatan, { max: 500 });
+    const tanggalTerima = readDateValue(tgl_terima, 'Tanggal terima', new Date());
+
+    const guardResult = await claimIdempotency({
+      request,
+      route: '/api/infak',
+      actorScope: 'admin',
+      actorId: auth.user.id,
+      ttlMs: 15 * 60 * 1000,
+      payload: {
+        nama_donatur: namaDonatur,
+        nominal: nominalValue,
+        catatan: catatanText,
+        tgl_terima: tanggalTerima.toISOString(),
+      },
+    });
+    if (!guardResult.success) {
+      return guardResult.response;
+    }
+    guard = guardResult.guard;
     
     // PIN verification
     const admin = await Admin.findByPk(auth.user.id);
@@ -91,11 +116,22 @@ export async function POST(request) {
     const pinValid = await admin.validPin(pin);
     if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
     
-    if (!nama_donatur || !nominal) {
-      return NextResponse.json(
-        { success: false, pesan: 'Nama donatur dan nominal harus diisi' },
-        { status: 400 }
-      );
+    const recentDuplicate = await InfakSedekah.findOne({
+      where: {
+        nama_donatur: namaDonatur,
+        nominal: nominalValue,
+        createdAt: { [Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
+      },
+      order: [['id', 'DESC']],
+    });
+    if (recentDuplicate) {
+      await logDuplicateAttempt('Infak duplikat ditolak', {
+        admin_id: auth.user.id,
+        recent_code: recentDuplicate.kode_transaksi,
+        nama_donatur: namaDonatur,
+        nominal: nominalValue,
+      });
+      return respondWithGuard(guard, { success: false, pesan: 'Infak serupa baru saja dicatat. Periksa riwayat sebelum mencoba lagi.' }, 409);
     }
     
     t = await sequelize.transaction();
@@ -104,10 +140,10 @@ export async function POST(request) {
     
     const infak = await InfakSedekah.create({
       kode_transaksi: kodeTransaksi,
-      nama_donatur,
-      nominal,
-      catatan,
-      tgl_terima: tgl_terima || new Date(),
+      nama_donatur: namaDonatur,
+      nominal: nominalValue,
+      catatan: catatanText,
+      tgl_terima: tanggalTerima,
       admin_id: auth.user.id,
     }, { transaction: t });
     
@@ -117,15 +153,15 @@ export async function POST(request) {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
-    const saldoBerjalan = (lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0) + parseFloat(nominal);
+    const saldoBerjalan = (lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0) + nominalValue;
     
     // Catat ke jurnal kas
     await JurnalKas.create({
-      tgl_transaksi: tgl_terima || new Date(),
+      tgl_transaksi: tanggalTerima,
       jenis: 'Masuk',
-      nominal,
+      nominal: nominalValue,
       referensi_kode: kodeTransaksi,
-      keterangan: `Infak/Sedekah dari ${nama_donatur}`,
+      keterangan: `Infak/Sedekah dari ${namaDonatur}`,
       saldo_berjalan: saldoBerjalan,
       admin_id: auth.user.id,
     }, { transaction: t });
@@ -140,8 +176,8 @@ export async function POST(request) {
       await Log.create({
         level: 'INFO',
         context: 'INFAK_SEDEKAH',
-        message: `[${auth.user.username}] Catat infak/sedekah dari ${nama_donatur}`,
-        detail: JSON.stringify({ nama_donatur, nominal, catatan }),
+        message: `[${auth.user.username}] Catat infak/sedekah dari ${namaDonatur}`,
+        detail: JSON.stringify({ nama_donatur: namaDonatur, nominal: nominalValue, catatan: catatanText }),
       });
     } catch (_) {}
     
@@ -150,11 +186,11 @@ export async function POST(request) {
       const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
       await kirimEmailAksiAdmin({
         aksi: 'Infak/Sedekah Baru',
-        deskripsi: `Infak dari ${nama_donatur}`,
+        deskripsi: `Infak dari ${namaDonatur}`,
         detail: `<table style="width:100%;border-collapse:collapse;margin-top:10px;">
-          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Donatur</strong></td><td style="padding:5px;border:1px solid #ddd;">${nama_donatur}</td></tr>
-          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Nominal</strong></td><td style="padding:5px;border:1px solid #ddd;">Rp ${parseFloat(nominal).toLocaleString('id-ID')}</td></tr>
-          ${catatan ? `<tr><td style="padding:5px;border:1px solid #ddd;"><strong>Catatan</strong></td><td style="padding:5px;border:1px solid #ddd;">${catatan}</td></tr>` : ''}
+          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Donatur</strong></td><td style="padding:5px;border:1px solid #ddd;">${namaDonatur}</td></tr>
+          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Nominal</strong></td><td style="padding:5px;border:1px solid #ddd;">Rp ${nominalValue.toLocaleString('id-ID')}</td></tr>
+          ${catatanText ? `<tr><td style="padding:5px;border:1px solid #ddd;"><strong>Catatan</strong></td><td style="padding:5px;border:1px solid #ddd;">${catatanText}</td></tr>` : ''}
         </table>`,
         adminNama: auth.user.nama_lengkap,
         adminJabatan: auth.user.jabatan,
@@ -164,13 +200,19 @@ export async function POST(request) {
       console.error('Gagal kirim email salinan:', emailErr);
     }
     
-    return NextResponse.json({
+    return respondWithGuard(guard, {
       success: true,
       pesan: 'Infak/sedekah berhasil dicatat',
       data: infak,
-    }, { status: 201 });
+    }, 201);
   } catch (error) {
     if (t) await t.rollback();
+    if (error instanceof ValidationError) {
+      return guard
+        ? respondWithGuard(guard, { success: false, pesan: error.message }, 400)
+        : NextResponse.json({ success: false, pesan: error.message }, { status: 400 });
+    }
+    await releaseGuard(guard);
     console.error('Create infak error:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },

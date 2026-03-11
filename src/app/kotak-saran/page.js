@@ -1,12 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { createIdempotencyKey } from '@/lib/client-idempotency';
 
 export default function KotakSaranPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaImage, setCaptchaImage] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaLoading, setCaptchaLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     nama_pengirim: '',
@@ -21,11 +26,39 @@ export default function KotakSaranPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const loadCaptcha = async () => {
+    setCaptchaLoading(true);
+    try {
+      const res = await fetch('/api/captcha', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.success) {
+        setCaptchaToken(data.data.token);
+        setCaptchaImage(data.data.image);
+        setCaptchaAnswer('');
+      } else {
+        setError('Gagal memuat captcha');
+      }
+    } catch {
+      setError('Gagal memuat captcha');
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCaptcha();
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (formData.isi_saran.length < 10) {
       setError('Isi saran minimal 10 karakter');
+      return;
+    }
+
+    if (!captchaToken || !captchaAnswer.trim()) {
+      setError('Captcha wajib diisi');
       return;
     }
 
@@ -36,8 +69,15 @@ export default function KotakSaranPage() {
     try {
       const res = await fetch('/api/saran', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-idempotency-key': createIdempotencyKey('saran')
+        },
+        body: JSON.stringify({
+          ...formData,
+          captcha_token: captchaToken,
+          captcha_answer: captchaAnswer,
+        }),
       });
 
       const data = await res.json();
@@ -51,11 +91,14 @@ export default function KotakSaranPage() {
           kategori: 'Saran',
           isi_saran: '',
         });
+        await loadCaptcha();
       } else {
         setError(data.pesan || 'Gagal mengirim saran');
+        await loadCaptcha();
       }
     } catch (err) {
       setError('Gagal mengirim saran. Silakan coba lagi.');
+      await loadCaptcha();
     } finally {
       setLoading(false);
     }
@@ -220,9 +263,44 @@ export default function KotakSaranPage() {
                 </p>
               </div>
 
+              <div className="rounded-xl border-2 border-gray-200 p-4 bg-gray-50">
+                <div className="flex items-center justify-between gap-4 mb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Verifikasi Captcha</p>
+                    <p className="text-xs text-gray-500">Masukkan 3 karakter pada gambar sebelum mengirim.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={loadCaptcha}
+                    disabled={captchaLoading || loading}
+                    className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg disabled:opacity-50"
+                  >
+                    {captchaLoading ? 'Memuat...' : 'Muat Ulang'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr,220px] gap-4 items-center">
+                  <div className="rounded-lg border bg-white p-3 flex justify-center min-h-[90px]">
+                    {captchaImage ? (
+                      <img src={captchaImage} alt="Captcha" className="h-16 object-contain" />
+                    ) : (
+                      <span className="text-sm text-gray-400 self-center">Captcha belum tersedia</span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value.toUpperCase())}
+                    placeholder="Masukkan captcha"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none transition-colors uppercase tracking-[0.3em]"
+                    maxLength="6"
+                    required
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || captchaLoading || !captchaToken}
                 className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
               >
                 {loading ? (

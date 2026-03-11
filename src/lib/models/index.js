@@ -16,6 +16,7 @@ const Absensi = require('./Absensi');
 const EmailServer = require('./EmailServer');
 const EmailLog = require('./EmailLog');
 const BukuPrestasiSantri = require('./BukuPrestasiSantri');
+const IdempotencyKey = require('./IdempotencyKey');
 
 // Relasi Role
 Role.hasMany(Admin, { foreignKey: 'role_id', as: 'admins' });
@@ -98,4 +99,5 @@ module.exports = {
   EmailServer,
   EmailLog,
   BukuPrestasiSantri,
+  IdempotencyKey,
 };

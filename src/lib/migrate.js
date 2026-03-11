@@ -4,7 +4,7 @@ const dotenvPath = path.resolve(__dirname, '../../.env.local');
 const dotenvFallback = path.resolve(__dirname, '../../.env');
 require('dotenv').config({ path: fs.existsSync(dotenvPath) ? dotenvPath : dotenvFallback });
 const { Op } = require('sequelize');
-const { sequelize, Admin, Role, Santri, PembayaranSPP, InfakSedekah, Pengeluaran, JurnalKas, Backup, Saran, Pengaturan, Kegiatan, PembayaranLain, Log, BukuPrestasiSantri } = require('./models');
+const { sequelize, Admin, Role, Santri, PembayaranSPP, InfakSedekah, Pengeluaran, JurnalKas, Backup, Saran, Pengaturan, Kegiatan, PembayaranLain, Log, BukuPrestasiSantri, IdempotencyKey } = require('./models');
 
 const ROLES_DEFAULT = [
   { id: 6, nama_role: 'Developer',    level: 0, is_system: true, deskripsi: 'Developer / Super Admin – akses penuh termasuk kelola Pimpinan', akses_default: null },

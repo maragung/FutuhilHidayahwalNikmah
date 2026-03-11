@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { safeHexColor } from '@/lib/color';
+import { createIdempotencyKey } from '@/lib/client-idempotency';
 
 /**
  * Bayar SPP – menggunakan /api/pembayaran/status untuk data bulan_status
@@ -203,7 +204,11 @@ function BayarPageInner() {
     try {
       const res  = await fetch('/api/pembayaran', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-idempotency-key': createIdempotencyKey('spp')
+        },
         body:    JSON.stringify({
           santri_id:              selectedSantri.id,
           bulan_list:             selectedBulan,

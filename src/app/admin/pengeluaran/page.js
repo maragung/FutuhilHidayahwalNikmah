@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { SkeletonTable } from '@/components/SkeletonLoader';
+import { createIdempotencyKey } from '@/lib/client-idempotency';
 
 export default function PengeluaranPage() {
   const [loading, setLoading] = useState(false);
@@ -119,7 +120,8 @@ export default function PengeluaranPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'x-idempotency-key': createIdempotencyKey('pengeluaran')
         },
         body: JSON.stringify({
           judul: formData.judul,

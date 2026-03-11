@@ -5,6 +5,8 @@ import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 import { createBackup, generateKodeInvoice } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
+import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
+import { ValidationError, readDateValue, readEnumValue, readOptionalText, readPositiveAmount, readRequiredText } from '@/lib/request-validation';
 
 // GET - Ambil semua pengeluaran
 export async function GET(request) {
@@ -74,6 +76,7 @@ export async function GET(request) {
 // POST - Tambah pengeluaran
 export async function POST(request) {
   let t;
+  let guard;
   
   try {
     await sequelize.authenticate();
@@ -88,6 +91,30 @@ export async function POST(request) {
     
     const body = await request.json();
     const { judul, nominal, catatan, tgl_keluar, kategori, pin } = body;
+    const judulText = readRequiredText(judul, 'Judul', { max: 150 });
+    const nominalValue = readPositiveAmount(nominal, 'Nominal');
+    const kategoriValue = readEnumValue(kategori, 'Kategori', ['Gaji', 'Listrik', 'Sarana', 'Pembangunan', 'ATK', 'Lainnya'], 'Lainnya');
+    const catatanText = readOptionalText(catatan, { max: 500 });
+    const tanggalKeluar = readDateValue(tgl_keluar, 'Tanggal keluar', new Date());
+
+    const guardResult = await claimIdempotency({
+      request,
+      route: '/api/pengeluaran',
+      actorScope: 'admin',
+      actorId: auth.user.id,
+      ttlMs: 15 * 60 * 1000,
+      payload: {
+        judul: judulText,
+        kategori: kategoriValue,
+        nominal: nominalValue,
+        catatan: catatanText,
+        tgl_keluar: tanggalKeluar.toISOString(),
+      },
+    });
+    if (!guardResult.success) {
+      return guardResult.response;
+    }
+    guard = guardResult.guard;
     
     // PIN verification
     const admin = await Admin.findByPk(auth.user.id);
@@ -96,11 +123,23 @@ export async function POST(request) {
     const pinValid = await admin.validPin(pin);
     if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
     
-    if (!judul || !nominal) {
-      return NextResponse.json(
-        { success: false, pesan: 'Judul dan nominal harus diisi' },
-        { status: 400 }
-      );
+    const recentDuplicate = await Pengeluaran.findOne({
+      where: {
+        judul: judulText,
+        kategori: kategoriValue,
+        nominal: nominalValue,
+        createdAt: { [Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
+      },
+      order: [['id', 'DESC']],
+    });
+    if (recentDuplicate) {
+      await logDuplicateAttempt('Pengeluaran duplikat ditolak', {
+        admin_id: auth.user.id,
+        recent_code: recentDuplicate.kode_pengeluaran,
+        judul: judulText,
+        nominal: nominalValue,
+      });
+      return respondWithGuard(guard, { success: false, pesan: 'Pengeluaran serupa baru saja dicatat. Periksa riwayat sebelum mencoba lagi.' }, 409);
     }
     
     t = await sequelize.transaction();
@@ -109,12 +148,12 @@ export async function POST(request) {
     
     const pengeluaran = await Pengeluaran.create({
       kode_pengeluaran: kodePengeluaran,
-      judul,
-      nominal,
-      catatan,
-      tgl_keluar: tgl_keluar || new Date(),
+      judul: judulText,
+      nominal: nominalValue,
+      catatan: catatanText,
+      tgl_keluar: tanggalKeluar,
       admin_id: auth.user.id,
-      kategori: kategori || 'Lainnya',
+      kategori: kategoriValue,
     }, { transaction: t });
     
     // Ambil saldo terakhir
@@ -123,15 +162,15 @@ export async function POST(request) {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
-    const saldoBerjalan = (lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0) - parseFloat(nominal);
+    const saldoBerjalan = (lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0) - nominalValue;
     
     // Catat ke jurnal kas
     await JurnalKas.create({
-      tgl_transaksi: tgl_keluar || new Date(),
+      tgl_transaksi: tanggalKeluar,
       jenis: 'Keluar',
-      nominal,
+      nominal: nominalValue,
       referensi_kode: kodePengeluaran,
-      keterangan: judul,
+      keterangan: judulText,
       saldo_berjalan: saldoBerjalan,
       admin_id: auth.user.id,
     }, { transaction: t });
@@ -146,8 +185,8 @@ export async function POST(request) {
       await Log.create({
         level: 'INFO',
         context: 'PENGELUARAN',
-        message: `[${auth.user.username}] Catat pengeluaran: ${judul}`,
-        detail: JSON.stringify({ judul, nominal, kategori, catatan }),
+        message: `[${auth.user.username}] Catat pengeluaran: ${judulText}`,
+        detail: JSON.stringify({ judul: judulText, nominal: nominalValue, kategori: kategoriValue, catatan: catatanText }),
       });
     } catch (_) {}
     
@@ -156,11 +195,11 @@ export async function POST(request) {
       const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
       await kirimEmailAksiAdmin({
         aksi: 'Pengeluaran Baru',
-        deskripsi: `Pengeluaran: ${judul}`,
+        deskripsi: `Pengeluaran: ${judulText}`,
         detail: `<table style="width:100%;border-collapse:collapse;margin-top:10px;">
-          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Judul</strong></td><td style="padding:5px;border:1px solid #ddd;">${judul}</td></tr>
-          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Kategori</strong></td><td style="padding:5px;border:1px solid #ddd;">${kategori || 'Lainnya'}</td></tr>
-          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Nominal</strong></td><td style="padding:5px;border:1px solid #ddd;">Rp ${parseFloat(nominal).toLocaleString('id-ID')}</td></tr>
+          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Judul</strong></td><td style="padding:5px;border:1px solid #ddd;">${judulText}</td></tr>
+          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Kategori</strong></td><td style="padding:5px;border:1px solid #ddd;">${kategoriValue}</td></tr>
+          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Nominal</strong></td><td style="padding:5px;border:1px solid #ddd;">Rp ${nominalValue.toLocaleString('id-ID')}</td></tr>
         </table>`,
         adminNama: auth.user.nama_lengkap,
         adminJabatan: auth.user.jabatan,
@@ -170,13 +209,19 @@ export async function POST(request) {
       console.error('Gagal kirim email salinan:', emailErr);
     }
     
-    return NextResponse.json({
+    return respondWithGuard(guard, {
       success: true,
       pesan: 'Pengeluaran berhasil dicatat',
       data: pengeluaran,
-    }, { status: 201 });
+    }, 201);
   } catch (error) {
     if (t) await t.rollback();
+    if (error instanceof ValidationError) {
+      return guard
+        ? respondWithGuard(guard, { success: false, pesan: error.message }, 400)
+        : NextResponse.json({ success: false, pesan: error.message }, { status: 400 });
+    }
+    await releaseGuard(guard);
     console.error('Create pengeluaran error:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },

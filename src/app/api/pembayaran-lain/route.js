@@ -5,6 +5,8 @@ import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 import { createBackup, generateKodeInvoice } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
+import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
+import { ValidationError, readEnumValue, readOptionalText, readPositiveAmount, readPositiveInteger } from '@/lib/request-validation';
 
 // GET - Ambil semua pembayaran lain
 export async function GET(request) {
@@ -60,6 +62,7 @@ export async function GET(request) {
 // POST - Tambah pembayaran lain
 export async function POST(request) {
   let t;
+  let guard;
   try {
     const auth = await verifyAuth(request);
     if (!auth.success) {
@@ -72,36 +75,75 @@ export async function POST(request) {
 
     const body = await request.json();
     const { santri_id, kegiatan_id, nominal, metode_bayar, keterangan, pin } = body;
+    const santriId = readPositiveInteger(santri_id, 'Santri');
+    const kegiatanId = readPositiveInteger(kegiatan_id, 'Kegiatan');
+    const metodeBayar = readEnumValue(metode_bayar, 'Metode bayar', ['Tunai', 'Transfer'], 'Tunai');
+    const keteranganText = readOptionalText(keterangan, { max: 500 });
 
     // PIN verification
     if (!pin) return NextResponse.json({ success: false, pesan: 'PIN wajib diisi' }, { status: 400 });
     const pinValid = await admin.validPin(pin);
     if (!pinValid) return NextResponse.json({ success: false, pesan: 'PIN tidak valid' }, { status: 403 });
 
-    if (!santri_id || !kegiatan_id) {
-      return NextResponse.json({ success: false, pesan: 'Santri dan kegiatan harus dipilih' }, { status: 400 });
-    }
-
-    const santri = await Santri.findByPk(santri_id);
-    if (!santri) return NextResponse.json({ success: false, pesan: 'Santri tidak ditemukan' }, { status: 404 });
-
-    const kegiatan = await Kegiatan.findByPk(kegiatan_id);
+    const kegiatan = await Kegiatan.findByPk(kegiatanId);
     if (!kegiatan) return NextResponse.json({ success: false, pesan: 'Kegiatan tidak ditemukan' }, { status: 404 });
 
-    t = await sequelize.transaction();
+    const nominalFinal = nominal ? readPositiveAmount(nominal, 'Nominal') : parseFloat(kegiatan.nominal);
 
-    const nominalFinal = nominal || parseFloat(kegiatan.nominal);
+    const guardResult = await claimIdempotency({
+      request,
+      route: '/api/pembayaran-lain',
+      actorScope: 'admin',
+      actorId: auth.user.id,
+      ttlMs: 15 * 60 * 1000,
+      payload: {
+        santri_id: santriId,
+        kegiatan_id: kegiatanId,
+        nominal: nominalFinal,
+        metode_bayar: metodeBayar,
+        keterangan: keteranganText,
+      },
+    });
+    if (!guardResult.success) {
+      return guardResult.response;
+    }
+    guard = guardResult.guard;
+
+    const santri = await Santri.findByPk(santriId);
+    if (!santri) return respondWithGuard(guard, { success: false, pesan: 'Santri tidak ditemukan' }, 404);
+
+    const recentDuplicate = await PembayaranLain.findOne({
+      where: {
+        santri_id: santriId,
+        kegiatan_id: kegiatanId,
+        nominal: nominalFinal,
+        metode_bayar: metodeBayar,
+        createdAt: { [Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
+      },
+      order: [['id', 'DESC']],
+    });
+    if (recentDuplicate) {
+      await logDuplicateAttempt('Pembayaran lain duplikat ditolak', {
+        admin_id: auth.user.id,
+        santri_id: santriId,
+        kegiatan_id: kegiatanId,
+        recent_invoice: recentDuplicate.kode_invoice,
+      });
+      return respondWithGuard(guard, { success: false, pesan: 'Pembayaran serupa baru saja dicatat. Periksa riwayat sebelum mencoba lagi.' }, 409);
+    }
+
+    t = await sequelize.transaction();
     const kodeInvoice = generateKodeInvoice('PBL');
 
     const pembayaran = await PembayaranLain.create({
       kode_invoice: kodeInvoice,
-      santri_id,
-      kegiatan_id,
+      santri_id: santriId,
+      kegiatan_id: kegiatanId,
       admin_id: auth.user.id,
       nominal: nominalFinal,
       tgl_bayar: new Date(),
-      metode_bayar: metode_bayar || 'Tunai',
-      keterangan,
+      metode_bayar: metodeBayar,
+      keterangan: keteranganText,
     }, { transaction: t });
 
     // Jurnal kas hanya jika kegiatan digabung ke saldo utama
@@ -135,7 +177,7 @@ export async function POST(request) {
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Santri</strong></td><td style="padding:5px;border:1px solid #ddd;">${santri.nama_lengkap} (${santri.nik})</td></tr>
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Kegiatan</strong></td><td style="padding:5px;border:1px solid #ddd;">${kegiatan.nama_kegiatan}</td></tr>
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Nominal</strong></td><td style="padding:5px;border:1px solid #ddd;">Rp ${nominalFinal.toLocaleString('id-ID')}</td></tr>
-          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Metode</strong></td><td style="padding:5px;border:1px solid #ddd;">${metode_bayar || 'Tunai'}</td></tr>
+          <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Metode</strong></td><td style="padding:5px;border:1px solid #ddd;">${metodeBayar}</td></tr>
           <tr><td style="padding:5px;border:1px solid #ddd;"><strong>Waktu</strong></td><td style="padding:5px;border:1px solid #ddd;">${waktu}</td></tr>
         </table>`,
         adminNama: admin.nama_lengkap,
@@ -144,9 +186,15 @@ export async function POST(request) {
       });
     } catch (e) { console.error('Email error:', e); }
 
-    return NextResponse.json({ success: true, pesan: 'Pembayaran berhasil dicatat', data: pembayaran }, { status: 201 });
+    return respondWithGuard(guard, { success: true, pesan: 'Pembayaran berhasil dicatat', data: pembayaran }, 201);
   } catch (error) {
     if (t) await t.rollback();
+    if (error instanceof ValidationError) {
+      return guard
+        ? respondWithGuard(guard, { success: false, pesan: error.message }, 400)
+        : NextResponse.json({ success: false, pesan: error.message }, { status: 400 });
+    }
+    await releaseGuard(guard);
     console.error('Create pembayaran lain error:', error);
     return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
   }

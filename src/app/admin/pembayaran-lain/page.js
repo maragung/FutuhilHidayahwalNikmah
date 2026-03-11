@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { safeHexColor } from '@/lib/color';
+import { createIdempotencyKey } from '@/lib/client-idempotency';
 
 export default function PembayaranLainPage() {
   const [activeTab, setActiveTab] = useState('pembayaran');
@@ -11,6 +12,7 @@ export default function PembayaranLainPage() {
   const [pin, setPin] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Kegiatan state
   const [kegiatanList, setKegiatanList] = useState([]);
@@ -142,10 +144,11 @@ export default function PembayaranLainPage() {
 
   const submitKegiatan = async () => {
     setError(''); setSuccess('');
+    setActionLoading(true);
     try {
       const res = await fetch('/api/kegiatan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-idempotency-key': createIdempotencyKey('kegiatan') },
         body: JSON.stringify({ ...kegiatanForm, pin })
       });
       const data = await res.json();
@@ -158,6 +161,8 @@ export default function PembayaranLainPage() {
       }
     } catch (err) {
       setError('Gagal menambahkan kegiatan');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -175,6 +180,7 @@ export default function PembayaranLainPage() {
 
   const submitEditKegiatan = async () => {
     setError(''); setSuccess('');
+    setActionLoading(true);
     try {
       const res = await fetch(`/api/kegiatan/${editKegiatan.id}`, {
         method: 'PUT',
@@ -191,6 +197,8 @@ export default function PembayaranLainPage() {
       }
     } catch (err) {
       setError('Gagal memperbarui kegiatan');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -201,6 +209,7 @@ export default function PembayaranLainPage() {
 
   const submitDeleteKegiatan = async () => {
     setError(''); setSuccess('');
+    setActionLoading(true);
     try {
       const res = await fetch(`/api/kegiatan/${deleteTarget.id}`, {
         method: 'DELETE',
@@ -217,6 +226,8 @@ export default function PembayaranLainPage() {
       }
     } catch (err) {
       setError('Gagal menghapus kegiatan');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -232,10 +243,11 @@ export default function PembayaranLainPage() {
 
   const submitPembayaran = async () => {
     setError(''); setSuccess('');
+    setActionLoading(true);
     try {
       const res = await fetch('/api/pembayaran-lain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-idempotency-key': createIdempotencyKey('pbl') },
         body: JSON.stringify({ ...payForm, pin })
       });
       const data = await res.json();
@@ -248,6 +260,8 @@ export default function PembayaranLainPage() {
       }
     } catch (err) {
       setError('Gagal menyimpan pembayaran');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -270,6 +284,7 @@ export default function PembayaranLainPage() {
   const submitEditPembayaran = async () => {
     if (!editPayment) return;
     setError(''); setSuccess('');
+    setActionLoading(true);
     try {
       const res = await fetch(`/api/pembayaran-lain/${editPayment.id}`, {
         method: 'PUT',
@@ -292,11 +307,14 @@ export default function PembayaranLainPage() {
       }
     } catch (err) {
       setError('Gagal memperbarui pembayaran');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const submitDeletePembayaran = async () => {
     setError(''); setSuccess('');
+    setActionLoading(true);
     try {
       const res = await fetch(`/api/pembayaran-lain/${deleteTarget.id}`, {
         method: 'DELETE',
@@ -313,6 +331,8 @@ export default function PembayaranLainPage() {
       }
     } catch (err) {
       setError('Gagal menghapus pembayaran');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -750,15 +770,16 @@ export default function PembayaranLainPage() {
               <button
                 onClick={() => { setShowPinModal(false); setPin(''); setDeleteTarget(null); setPendingAction(null); }}
                 className="btn btn-secondary flex-1"
+                disabled={actionLoading}
               >
                 Batal
               </button>
               <button
                 onClick={handlePinConfirm}
-                disabled={!pin}
+                disabled={actionLoading || !pin}
                 className="btn btn-primary flex-1"
               >
-                Konfirmasi
+                {actionLoading ? 'Memproses...' : 'Konfirmasi'}
               </button>
             </div>
           </div>
