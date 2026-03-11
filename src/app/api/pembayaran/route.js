@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/auth';
 import { PembayaranSPP, Santri, Admin, JurnalKas, Pengaturan, Log } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
-import { createBackup, generateKodeInvoice } from '@/lib/utils';
+import { createBackup, generateKodeInvoice, resolveSppTransactionDate } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 // GET - Ambil semua pembayaran
@@ -266,12 +266,13 @@ export async function POST(request) {
     
     for (const bulan of bulanList) {
       const kodeInvoice = generateKodeInvoice('SPP');
+      const tanggalTransaksi = resolveSppTransactionDate(tahunInt, bulan);
       
       const pembayaran = await PembayaranSPP.create({
         kode_invoice: kodeInvoice,
         santri_id,
         admin_id: auth.user.id,
-        tgl_bayar: new Date(),
+        tgl_bayar: tanggalTransaksi,
         bulan_spp: bulan,
         tahun_spp: tahunInt,
         nominal: nominalPerBulan,
@@ -286,7 +287,7 @@ export async function POST(request) {
       
       // Catat ke jurnal kas
       await JurnalKas.create({
-        tgl_transaksi: new Date(),
+        tgl_transaksi: tanggalTransaksi,
         jenis: 'Masuk',
         nominal: nominalPerBulan,
         referensi_kode: kodeInvoice,

@@ -45,6 +45,26 @@ export function generateKodeInvoice(prefix = 'SPP') {
   return `${prefix}-${year}${month}-${timestamp}${random}`;
 }
 
+export function resolveSppTransactionDate(tahunSpp, bulanSpp, fallbackDate = new Date()) {
+  const tahun = Number(tahunSpp);
+  const bulan = Number(bulanSpp);
+
+  if (!Number.isInteger(tahun) || !Number.isInteger(bulan) || bulan < 1 || bulan > 12) {
+    return fallbackDate;
+  }
+
+  const fallback = new Date(fallbackDate);
+  const isPeriodeBerjalan =
+    tahun === fallback.getFullYear() &&
+    bulan === fallback.getMonth() + 1;
+
+  if (isPeriodeBerjalan) {
+    return fallback;
+  }
+
+  return new Date(tahun, bulan - 1, 1, 12, 0, 0, 0);
+}
+
 export function formatCurrency(amount) {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
