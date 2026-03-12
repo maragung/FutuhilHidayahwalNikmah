@@ -32,6 +32,7 @@ function BayarPageInner() {
   const [cancelModal, setCancelModal] = useState({ show: false, payment: null, bulan: null, cancelPin: '' });
   const [cancelLoading, setCancelLoading] = useState(false);
   const [canAbaikanNominal, setCanAbaikanNominal] = useState(false);
+  const [sortSantri, setSortSantri] = useState('no_absen');
   const [settings, setSettings] = useState({
     nominal_spp_non_subsidi: '40000',
     nominal_spp_subsidi: '30000',
@@ -266,9 +267,19 @@ function BayarPageInner() {
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const filteredSantri = statusList.filter(s =>
-    s.nama_lengkap.toLowerCase().includes(search.toLowerCase()) || s.nik.includes(search)
-  );
+  const filteredSantri = statusList
+    .filter(s =>
+      s.nama_lengkap.toLowerCase().includes(search.toLowerCase()) || s.nik.includes(search)
+    )
+    .sort((a, b) => {
+      if (sortSantri === 'no_absen') {
+        const aAbsen = a.no_absen ?? Infinity;
+        const bAbsen = b.no_absen ?? Infinity;
+        if (aAbsen !== bAbsen) return aAbsen - bAbsen;
+        return a.nama_lengkap.localeCompare(b.nama_lengkap, 'id');
+      }
+      return a.nama_lengkap.localeCompare(b.nama_lengkap, 'id');
+    });
   const totalBayar     = selectedBulan.length * nominal;
   const earliestUnpaid = getEarliestUnpaid();
   const bulanMulai     = getBulanMulai();
@@ -316,8 +327,32 @@ function BayarPageInner() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari nama atau NIK..."
-            className="input-field mb-3"
+            className="input-field mb-2"
           />
+
+          <div className="flex items-center gap-1 mb-3">
+            <span className="text-xs text-gray-500 shrink-0">Urut:</span>
+            <button
+              onClick={() => setSortSantri('no_absen')}
+              className={`text-xs px-2 py-1 rounded border transition-colors ${
+                sortSantri === 'no_absen'
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
+              }`}
+            >
+              No. Absen
+            </button>
+            <button
+              onClick={() => setSortSantri('nama')}
+              className={`text-xs px-2 py-1 rounded border transition-colors ${
+                sortSantri === 'nama'
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
+              }`}
+            >
+              Nama
+            </button>
+          </div>
 
           {statusLoading ? (
             <div className="flex items-center justify-center h-32 text-gray-400 text-sm gap-2">
@@ -352,6 +387,7 @@ function BayarPageInner() {
                   >
                     <p className="font-medium text-sm" style={{ color: warna }}>{santri.nama_lengkap}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
+                      {santri.no_absen != null && <span className="font-mono mr-1">#{santri.no_absen}</span>}
                       {santri.nik} • {santri.jilid}
                       {!santri.status_aktif && <span className="ml-1 text-red-500">• Nonaktif</span>}
                     </p>

@@ -333,7 +333,7 @@ export async function POST(request) {
       nominal_per_bulan: nominalPerBulan,
     }, 201);
   } catch (error) {
-    if (t) await t.rollback();
+    if (t) { try { await t.rollback(); } catch (_) {} }
     if (error instanceof ValidationError) {
       return guard
         ? respondWithGuard(guard, { success: false, pesan: error.message }, 400)

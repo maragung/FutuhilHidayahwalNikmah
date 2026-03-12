@@ -103,54 +103,61 @@ export async function claimIdempotency({
     };
   }
 
-  const requestHash = hashRequestPayload(payload);
-  const now = Date.now();
-  const expiresAt = new Date(now + ttlMs);
-  const existing = await IdempotencyKey.findOne({ where: { idempotency_key: idempotencyKey } });
-
-  if (existing) {
-    const isExpired = existing.expires_at && new Date(existing.expires_at).getTime() <= now;
-    if (isExpired && existing.status !== 'PROCESSING') {
-      await existing.destroy();
-    } else {
-      return handleExistingKey(existing, requestHash, route, actorScope, actorId);
-    }
-  }
-
   try {
-    const record = await IdempotencyKey.create({
-      idempotency_key: idempotencyKey,
-      route,
-      actor_scope: actorScope,
-      actor_id: actorId,
-      request_hash: requestHash,
-      status: 'PROCESSING',
-      expires_at: expiresAt,
-      last_seen_at: new Date(now),
-    });
+    const requestHash = hashRequestPayload(payload);
+    const now = Date.now();
+    const expiresAt = new Date(now + ttlMs);
+    const existing = await IdempotencyKey.findOne({ where: { idempotency_key: idempotencyKey } });
 
-    return {
-      success: true,
-      guard: {
-        record,
-        route,
-        actorScope,
-        actorId,
-      },
-    };
-  } catch (_) {
-    const conflicted = await IdempotencyKey.findOne({ where: { idempotency_key: idempotencyKey } });
-    if (conflicted) {
-      return handleExistingKey(conflicted, requestHash, route, actorScope, actorId);
+    if (existing) {
+      const isExpired = existing.expires_at && new Date(existing.expires_at).getTime() <= now;
+      if (isExpired && existing.status !== 'PROCESSING') {
+        try { await existing.destroy(); } catch (_) {}
+      } else {
+        return handleExistingKey(existing, requestHash, route, actorScope, actorId);
+      }
     }
 
-    return {
-      success: false,
-      response: NextResponse.json(
-        { success: false, pesan: 'Gagal memproses idempotency key' },
-        { status: 500 }
-      ),
-    };
+    try {
+      const record = await IdempotencyKey.create({
+        idempotency_key: idempotencyKey,
+        route,
+        actor_scope: actorScope,
+        actor_id: actorId,
+        request_hash: requestHash,
+        status: 'PROCESSING',
+        expires_at: expiresAt,
+        last_seen_at: new Date(now),
+      });
+
+      return {
+        success: true,
+        guard: {
+          record,
+          route,
+          actorScope,
+          actorId,
+        },
+      };
+    } catch (_) {
+      const conflicted = await IdempotencyKey.findOne({ where: { idempotency_key: idempotencyKey } });
+      if (conflicted) {
+        return handleExistingKey(conflicted, requestHash, route, actorScope, actorId);
+      }
+
+      return {
+        success: false,
+        response: NextResponse.json(
+          { success: false, pesan: 'Gagal memproses idempotency key' },
+          { status: 500 }
+        ),
+      };
+    }
+  } catch (dbError) {
+    // Tabel idempotency_keys belum ada atau DB error — lanjutkan tanpa perlindungan idempotency
+    // Jalankan `npm run db:migrate` untuk membuat tabel yang hilang.
+    console.warn('[request-guard] Idempotency service tidak tersedia, lanjutkan tanpa guard:', dbError?.message);
+    return { success: true, guard: null };
   }
 }
 
