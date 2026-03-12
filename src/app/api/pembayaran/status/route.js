@@ -28,11 +28,16 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const tahun = parseInt(searchParams.get('tahun')) || new Date().getFullYear();
     const includeNonaktif = searchParams.get('include_nonaktif') === 'true';
+    const santriIdFilter = searchParams.get('santri_id') ? parseInt(searchParams.get('santri_id')) : null;
     
     // Default: hanya santri aktif agar yang nonaktif tidak muncul lagi di Bayar SPP.
     // Halaman Data Santri dapat mengirim include_nonaktif=true untuk tetap mengelola santri nonaktif.
     const santriList = await Santri.findAll({
-      where: { status_lulus: false, ...(includeNonaktif ? {} : { status_aktif: true }) },
+      where: {
+        status_lulus: false,
+        ...(includeNonaktif ? {} : { status_aktif: true }),
+        ...(santriIdFilter ? { id: santriIdFilter } : {}),
+      },
       order: [['nama_lengkap', 'ASC']],
       attributes: ['id', 'no_absen', 'nik', 'nama_lengkap', 'jenis_kelamin', 'jilid', 'tgl_mendaftar', 'status_aktif', 'tgl_nonaktif', 'nama_wali', 'no_telp_wali', 'is_subsidi', 'status_lulus', 'tgl_lulus'],
     });
