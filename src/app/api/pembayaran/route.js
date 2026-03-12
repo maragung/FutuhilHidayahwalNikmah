@@ -239,7 +239,7 @@ export async function POST(request) {
         return respondWithGuard(guard, { success: false, pesan: 'Tidak memiliki akses untuk abaikan aturan nominal' }, 403);
       }
       const manualNominal = parseInt(nominal_per_bulan, 10);
-      if (!Number.isInteger(manualNominal) || manualNominal <= 0) {
+      if (!Number.isInteger(manualNominal) || manualNominal < 0) {
         return respondWithGuard(guard, { success: false, pesan: 'Nominal manual tidak valid' }, 400);
       }
       nominalPerBulan = manualNominal;

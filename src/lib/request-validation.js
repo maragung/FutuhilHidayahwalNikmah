@@ -49,8 +49,8 @@ export function readPositiveInteger(value, label) {
 
 export function readPositiveAmount(value, label) {
   const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new ValidationError(`${label} harus lebih dari 0`);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new ValidationError(`${label} tidak boleh negatif`);
   }
   return parsed;
 }
