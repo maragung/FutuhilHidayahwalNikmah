@@ -160,7 +160,7 @@ export async function GET(request) {
       
       for (let bulan = 1; bulan <= 12; bulan++) {
         const wajib = bulan >= bulanAwalWajib && bulan <= bulanAkhirWajib;
-        if (payments[bulan]) {
+        if (bulan in payments) {
           bulanStatus[bulan] = { dibayar: true, nominal: payments[bulan], wajib };
           totalBayar += payments[bulan];
           if (wajib) bulanTerbayar++;

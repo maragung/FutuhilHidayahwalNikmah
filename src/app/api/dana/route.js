@@ -4,14 +4,6 @@ import { JurnalKas, PembayaranSPP, InfakSedekah, Pengeluaran } from '@/lib/model
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 
-const NON_SPP_JURNAL_WHERE = {
-  [Op.and]: [
-    { referensi_kode: { [Op.notLike]: 'SPP-%' } },
-    { referensi_kode: { [Op.notLike]: 'ADJ-SPP-%' } },
-    { referensi_kode: { [Op.notLike]: 'REV-SPP-%' } },
-  ],
-};
-
 // GET - Ringkasan dana
 export async function GET(request) {
   try {
@@ -40,7 +32,7 @@ export async function GET(request) {
       where: {
         jenis: 'Masuk',
         tgl_transaksi: { [Op.between]: [startDate, endDate] },
-        ...NON_SPP_JURNAL_WHERE,
+        referensi_kode: { [Op.notLike]: 'SPP-%' },
       },
     }) || 0;
     
@@ -107,7 +99,7 @@ export async function GET(request) {
         where: {
           jenis: 'Masuk',
           tgl_transaksi: { [Op.between]: [bulanStart, bulanEnd] },
-          ...NON_SPP_JURNAL_WHERE,
+          referensi_kode: { [Op.notLike]: 'SPP-%' },
         },
       }) || 0;
 
