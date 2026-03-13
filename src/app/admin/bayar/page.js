@@ -153,10 +153,15 @@ function BayarPageInner() {
 
   // ── Helper: baca bulan_status dari server ──────────────────────────────────
   const getBulanInfo = (bulan) => {
-    if (!selectedSantri) return { wajib: false, dibayar: false, alasan: null };
+    if (!selectedSantri) return { wajib: false, dibayar: false, alasan: null, canSelectWithManualNominal: false };
     const st = selectedSantri.bulan_status?.[bulan];
-    if (!st) return { wajib: false, dibayar: false, alasan: null };
-    return { wajib: !!st.wajib, dibayar: !!st.dibayar, alasan: st.alasan || null };
+    if (!st) return { wajib: false, dibayar: false, alasan: null, canSelectWithManualNominal: false };
+    return { 
+      wajib: !!st.wajib, 
+      dibayar: !!st.dibayar, 
+      alasan: st.alasan || null,
+      canSelectWithManualNominal: !!st.canSelectWithManualNominal,
+    };
   };
 
   const getEarliestUnpaid = () => {
@@ -176,29 +181,59 @@ function BayarPageInner() {
     return null;
   };
 
-  // ── Pilih bulan (berurutan) ────────────────────────────────────────────────
+  // ── Pilih bulan (berurutan untuk wajib, manual untuk nonaktif) ──────────────
   const handleBulanChange = (bulan) => {
-    const { wajib, dibayar } = getBulanInfo(bulan);
-    if (dibayar || !wajib) return;
-    const earliest = getEarliestUnpaid();
-    if (!earliest) return;
-    setSelectedBulan(prev => {
-      if (prev.includes(bulan)) {
+    const { wajib, dibayar, canSelectWithManualNominal } = getBulanInfo(bulan);
+    if (dibayar) return;
+    
+    // Bulan wajib harus berurutan dari earliest unpaid
+    if (wajib) {
+      const earliest = getEarliestUnpaid();
+      if (!earliest) return;
+      setSelectedBulan(prev => {
+        if (prev.includes(bulan)) {
+          const sorted = [...prev].sort((a, b) => a - b);
+          if (bulan !== sorted[sorted.length - 1]) return prev;
+          return prev.filter(b => b !== bulan);
+        }
         const sorted = [...prev].sort((a, b) => a - b);
-        if (bulan !== sorted[sorted.length - 1]) return prev;
-        return prev.filter(b => b !== bulan);
-      }
-      const sorted = [...prev].sort((a, b) => a - b);
-      const expectedNext = sorted.length === 0 ? earliest : sorted[sorted.length - 1] + 1;
-      if (bulan !== expectedNext) return prev;
-      return [...prev, bulan].sort((a, b) => a - b);
-    });
+        const expectedNext = sorted.length === 0 ? earliest : sorted[sorted.length - 1] + 1;
+        if (bulan !== expectedNext) return prev;
+        return [...prev, bulan].sort((a, b) => a - b);
+      });
+    } 
+    // Bulan nonaktif bisa dipilih jika user bisa tulis nominal manual
+    else if (canSelectWithManualNominal && canAbaikanNominal) {
+      setSelectedBulan(prev => {
+        if (prev.includes(bulan)) {
+          return prev.filter(b => b !== bulan);
+        }
+        return [...prev, bulan].sort((a, b) => a - b);
+      });
+    }
   };
 
   // ── Submit pembayaran ──────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!selectedSantri || selectedBulan.length === 0) return;
     if (!pin) { setError('PIN wajib diisi untuk verifikasi'); return; }
+    
+    // Cek apakah ada bulan nonaktif yang dipilih
+    let hasNonaktifMonth = false;
+    for (const bulan of selectedBulan) {
+      const { canSelectWithManualNominal } = getBulanInfo(bulan);
+      if (canSelectWithManualNominal) {
+        hasNonaktifMonth = true;
+        break;
+      }
+    }
+    
+    // Jika ada bulan nonaktif, wajib input nominal manual
+    if (hasNonaktifMonth && !abaikanAturanNominal) {
+      setError('Bulan nonaktif memerlukan input nominal manual. Harap centang "Input nominal manual".'); 
+      return;
+    }
+    
     setSubmitLoading(true);
     setError('');
     const token = localStorage.getItem('auth_token');
@@ -465,13 +500,14 @@ function BayarPageInner() {
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-5">
                 {namaBulan.map((nama, index) => {
                   const bulan            = index + 1;
-                  const { wajib, dibayar, alasan } = getBulanInfo(bulan);
+                  const { wajib, dibayar, alasan, canSelectWithManualNominal } = getBulanInfo(bulan);
                   const isSelected       = selectedBulan.includes(bulan);
                   const selectedSorted   = [...selectedBulan].sort((a, b) => a - b);
                   const expectedNext     = selectedSorted.length === 0
                     ? earliestUnpaid
                     : selectedSorted[selectedSorted.length - 1] + 1;
                   const canSelect        = wajib && !dibayar && bulan === expectedNext;
+                  const canSelectNonaktif = canSelectWithManualNominal && !dibayar && canAbaikanNominal;
                   const isBeforeReg      = !wajib && alasan === 'Belum Terdaftar';
                   const isNonaktif       = !wajib && alasan === 'Nonaktif';
 
@@ -487,8 +523,33 @@ function BayarPageInner() {
                     );
                   }
 
-                  // Nonaktif → oranye
+                  // Nonaktif → bisa dipilih jika setting nominal manual, atau unclickable
                   if (isNonaktif) {
+                    // Jika selected, tampilkan sama seperti bulan wajib yang selected
+                    if (isSelected) {
+                      return (
+                        <button key={bulan}
+                          onClick={() => handleBulanChange(bulan)}
+                          className="p-3 rounded-lg border-2 bg-blue-500 border-blue-600 text-white text-center hover:bg-blue-600 transition-colors"
+                          title="Nonaktif - dipilih untuk input manual. Klik untuk hapus.">
+                          <p className="text-sm font-medium">{nama.substring(0,3)}</p>
+                          <p className="text-xs mt-0.5">✓</p>
+                        </button>
+                      );
+                    }
+                    // Jika bisa dipilih (admin dengan akses nominal manual)
+                    if (canSelectNonaktif) {
+                      return (
+                        <button key={bulan}
+                          onClick={() => handleBulanChange(bulan)}
+                          className="p-3 rounded-lg border-2 bg-orange-50 border-orange-300 text-center hover:bg-orange-100 cursor-pointer transition-colors"
+                          title="Nonaktif - bisa dipilih untuk input nominal manual">
+                          <p className="text-sm text-orange-600 font-medium">{nama.substring(0,3)}</p>
+                          <p className="text-xs text-orange-400 mt-0.5">◆</p>
+                        </button>
+                      );
+                    }
+                    // Tidak bisa dipilih
                     return (
                       <div key={bulan}
                         className="p-3 rounded-lg border-2 bg-orange-50 border-orange-200 text-center cursor-not-allowed"

@@ -187,28 +187,37 @@ export async function POST(request) {
     }
 
     const bulanTidakWajib = bulanList.filter((b) => b < bulanAwalWajib || b > bulanAkhirWajib);
-    if (bulanTidakWajib.length > 0) {
+    // Izinkan bulan nonaktif jika admin menginput nominal manual (abaikan_aturan_nominal)
+    if (bulanTidakWajib.length > 0 && !abaikan_aturan_nominal) {
       return respondWithGuard(guard, { success: false, pesan: `Bulan ${bulanTidakWajib.join(', ')} tidak termasuk masa wajib bayar` }, 400);
     }
 
-    let bulanPertamaBelumBayar = null;
-    for (let b = bulanAwalWajib; b <= bulanAkhirWajib; b++) {
-      if (!paidSet.has(b)) {
-        bulanPertamaBelumBayar = b;
-        break;
+    // Untuk bulan wajib (dalam range), enforce sequential payment
+    const bulanWajibInRequest = bulanList.filter((b) => b >= bulanAwalWajib && b <= bulanAkhirWajib);
+    
+    if (bulanWajibInRequest.length > 0) {
+      // Ada bulan wajib - cek urutan dari bulan pertama belum bayar
+      let bulanPertamaBelumBayar = null;
+      for (let b = bulanAwalWajib; b <= bulanAkhirWajib; b++) {
+        if (!paidSet.has(b)) {
+          bulanPertamaBelumBayar = b;
+          break;
+        }
       }
-    }
 
-    if (!bulanPertamaBelumBayar) {
-      return respondWithGuard(guard, { success: false, pesan: 'Semua bulan wajib sudah lunas' }, 400);
-    }
+      if (!bulanPertamaBelumBayar && bulanWajibInRequest.length > 0) {
+        return respondWithGuard(guard, { success: false, pesan: 'Semua bulan wajib sudah lunas' }, 400);
+      }
 
-    const expected = [];
-    for (let i = 0; i < bulanList.length; i++) {
-      expected.push(bulanPertamaBelumBayar + i);
-    }
-    if (expected[expected.length - 1] > bulanAkhirWajib || bulanList.some((b, i) => b !== expected[i])) {
-      return respondWithGuard(guard, { success: false, pesan: `Pembayaran tidak boleh melompati bulan. Harus mulai dari bulan ${bulanPertamaBelumBayar} secara berurutan.` }, 400);
+      if (bulanPertamaBelumBayar && bulanWajibInRequest.length > 0) {
+        const expectedWajib = [];
+        for (let i = 0; i < bulanWajibInRequest.length; i++) {
+          expectedWajib.push(bulanPertamaBelumBayar + i);
+        }
+        if (expectedWajib[expectedWajib.length - 1] > bulanAkhirWajib || bulanWajibInRequest.some((b, i) => b !== expectedWajib[i])) {
+          return respondWithGuard(guard, { success: false, pesan: `Bulan wajib tidak boleh melompati bulan. Harus berurutan dari bulan ${bulanPertamaBelumBayar}.` }, 400);
+        }
+      }
     }
     
     // Aturan nominal keluarga + subsidi:

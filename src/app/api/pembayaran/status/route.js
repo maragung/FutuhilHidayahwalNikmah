@@ -160,6 +160,7 @@ export async function GET(request) {
       
       for (let bulan = 1; bulan <= 12; bulan++) {
         const wajib = bulan >= bulanAwalWajib && bulan <= bulanAkhirWajib;
+        const isNonaktif = !wajib && bulan >= bulanAwalWajib && bulan > bulanAkhirWajib;
         if (bulan in payments) {
           bulanStatus[bulan] = { dibayar: true, nominal: payments[bulan], wajib };
           totalBayar += payments[bulan];
@@ -169,6 +170,8 @@ export async function GET(request) {
             dibayar: false,
             nominal: null,
             wajib,
+            // Bulan nonaktif bisa dipilih admin untuk input nominal manual
+            canSelectWithManualNominal: isNonaktif,
             alasan: !wajib ? (bulan < bulanAwalWajib ? 'Belum Terdaftar' : 'Nonaktif') : null,
           };
         }
