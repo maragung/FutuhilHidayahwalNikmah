@@ -167,7 +167,7 @@ export async function GET(request) {
         } else {
           bulanStatus[bulan] = {
             dibayar: false,
-            nominal: 0,
+            nominal: null,
             wajib,
             alasan: !wajib ? (bulan < bulanAwalWajib ? 'Belum Terdaftar' : 'Nonaktif') : null,
           };
