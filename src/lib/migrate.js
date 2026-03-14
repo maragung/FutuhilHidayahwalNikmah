@@ -3,7 +3,7 @@ const path = require('path');
 const dotenvPath = path.resolve(__dirname, '../../.env.local');
 const dotenvFallback = path.resolve(__dirname, '../../.env');
 require('dotenv').config({ path: fs.existsSync(dotenvPath) ? dotenvPath : dotenvFallback });
-const { Op } = require('sequelize');
+const { Op, DataTypes } = require('sequelize');
 const { sequelize, Admin, Role, Santri, PembayaranSPP, InfakSedekah, Pengeluaran, JurnalKas, Backup, Saran, Pengaturan, Kegiatan, PembayaranLain, Log, BukuPrestasiSantri, IdempotencyKey } = require('./models');
 
 const ROLES_DEFAULT = [
@@ -14,6 +14,64 @@ const ROLES_DEFAULT = [
   { id: 4, nama_role: 'Pengajar',     level: 4, is_system: true, deskripsi: 'Pengajar / Ustadz – akses terbatas',  akses_default: JSON.stringify(['santri','prestasi_santri','laporan','saran','notifikasi','akun']) },
   { id: 5, nama_role: 'Lainnya',      level: 5, is_system: true, deskripsi: 'Role lainnya – akses terbatas',       akses_default: JSON.stringify(['dashboard']) },
 ];
+
+async function ensureAuditColumnsForAllTables() {
+  const queryInterface = sequelize.getQueryInterface();
+  const rawTables = await queryInterface.showAllTables();
+
+  const tableNames = rawTables
+    .map((table) => {
+      if (typeof table === 'string') return table;
+      if (table && typeof table === 'object') {
+        if (table.tableName) return table.tableName;
+        const values = Object.values(table);
+        return typeof values[0] === 'string' ? values[0] : null;
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  let addedCount = 0;
+
+  for (const tableName of tableNames) {
+    let columns;
+    try {
+      columns = await queryInterface.describeTable(tableName);
+    } catch (error) {
+      console.warn(`⚠️ Lewati ${tableName}: tidak dapat membaca struktur tabel (${error.message})`);
+      continue;
+    }
+
+    if (!columns.created_at) {
+      await queryInterface.addColumn(tableName, 'created_at', {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
+      });
+      addedCount += 1;
+    }
+
+    if (!columns.updated_at) {
+      await queryInterface.addColumn(tableName, 'updated_at', {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
+      });
+      addedCount += 1;
+    }
+
+    if (!columns.deleted_at) {
+      await queryInterface.addColumn(tableName, 'deleted_at', {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+      });
+      addedCount += 1;
+    }
+  }
+
+  console.log(`✅ Audit kolom disinkronkan (total kolom ditambahkan: ${addedCount})`);
+}
 
 async function migrate() {
   try {
@@ -27,6 +85,8 @@ async function migrate() {
     await sequelize.sync({ alter: true });
     console.log('✅ Semua tabel berhasil dibuat/diupdate!');
     console.log('   • Kolom no_absen tersedia di tabel santri (nullable, integer)');
+
+    await ensureAuditColumnsForAllTables();
 
     await sequelize.query(`
       UPDATE jurnal_kas
