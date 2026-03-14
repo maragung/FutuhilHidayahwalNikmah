@@ -8,6 +8,23 @@ import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
 import { ValidationError, ensureArray, readEnumValue, readOptionalText, readPositiveInteger } from '@/lib/request-validation';
 
+async function verifyAdminPin(adminId, pin) {
+  const admin = await Admin.findByPk(adminId);
+  if (!admin) {
+    return { success: false, status: 404, pesan: 'Admin tidak ditemukan' };
+  }
+  if (!pin) {
+    return { success: false, status: 400, pesan: 'PIN wajib diisi' };
+  }
+
+  const pinValid = await admin.validPin(pin);
+  if (!pinValid) {
+    return { success: false, status: 403, pesan: 'PIN tidak valid' };
+  }
+
+  return { success: true, admin };
+}
+
 // GET - Ambil semua pembayaran
 export async function GET(request) {
   try {
@@ -125,12 +142,10 @@ export async function POST(request) {
     }
     guard = guardResult.guard;
     
-    // PIN verification
-    const admin = await Admin.findByPk(auth.user.id);
-    if (!admin) return respondWithGuard(guard, { success: false, pesan: 'Admin tidak ditemukan' }, 404);
-    if (!pin) return respondWithGuard(guard, { success: false, pesan: 'PIN wajib diisi' }, 400);
-    const pinValid = await admin.validPin(pin);
-    if (!pinValid) return respondWithGuard(guard, { success: false, pesan: 'PIN tidak valid' }, 403);
+    const pinCheck = await verifyAdminPin(auth.user.id, pin);
+    if (!pinCheck.success) {
+      return respondWithGuard(guard, { success: false, pesan: pinCheck.pesan }, pinCheck.status);
+    }
     
     const santri = await Santri.findByPk(santriId);
     if (!santri) {
@@ -359,6 +374,136 @@ export async function POST(request) {
     }
     await releaseGuard(guard);
     console.error('Create pembayaran error:', error);
+    return NextResponse.json(
+      { success: false, pesan: 'Terjadi kesalahan server' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Batalkan pembayaran SPP (batch)
+export async function DELETE(request) {
+  let t;
+
+  try {
+    await sequelize.authenticate();
+
+    const auth = await verifyAuth(request);
+    if (!auth.success) {
+      return NextResponse.json(
+        { success: false, pesan: auth.error },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const ids = [...new Set(ensureArray(body?.ids, 'Daftar pembayaran').map((id) => Number.parseInt(id, 10)))].filter(
+      (id) => Number.isInteger(id) && id > 0
+    );
+
+    if (ids.length === 0) {
+      throw new ValidationError('Daftar pembayaran tidak valid');
+    }
+
+    const pinCheck = await verifyAdminPin(auth.user.id, body?.pin);
+    if (!pinCheck.success) {
+      return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
+    }
+
+    t = await sequelize.transaction();
+
+    const pembayaranList = await PembayaranSPP.findAll({
+      where: { id: { [Op.in]: ids } },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    if (pembayaranList.length !== ids.length) {
+      const foundIds = new Set(pembayaranList.map((p) => Number(p.id)));
+      const missingIds = ids.filter((id) => !foundIds.has(id));
+      await t.rollback();
+      return NextResponse.json(
+        { success: false, pesan: `Data pembayaran tidak ditemukan untuk id: ${missingIds.join(', ')}` },
+        { status: 404 }
+      );
+    }
+
+    const orderedPayments = pembayaranList.sort((a, b) => {
+      const aTime = new Date(a.tgl_bayar).getTime();
+      const bTime = new Date(b.tgl_bayar).getTime();
+      if (aTime !== bTime) return aTime - bTime;
+      return Number(a.id) - Number(b.id);
+    });
+
+    const dataSebelum = orderedPayments.map((p) => p.toJSON());
+
+    const lastJurnal = await JurnalKas.findOne({
+      order: [['id', 'DESC']],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    let saldoBerjalan = lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0;
+
+    for (const pembayaran of orderedPayments) {
+      const nominal = Number(pembayaran.nominal);
+      const tanggalTransaksi =
+        pembayaran.tgl_bayar || resolveSppTransactionDate(pembayaran.tahun_spp, pembayaran.bulan_spp);
+
+      saldoBerjalan -= nominal;
+
+      await JurnalKas.create(
+        {
+          tgl_transaksi: tanggalTransaksi,
+          jenis: 'Keluar',
+          nominal,
+          referensi_kode: `REV-${pembayaran.kode_invoice}`,
+          keterangan: `Pembatalan pembayaran ${pembayaran.kode_invoice}`,
+          saldo_berjalan: saldoBerjalan,
+          admin_id: auth.user.id,
+        },
+        { transaction: t }
+      );
+
+      await pembayaran.destroy({ transaction: t });
+    }
+
+    await t.commit();
+
+    await createBackup('Hapus Pembayaran SPP (Batch)', 'pembayaran_spp', dataSebelum, null, auth.user.id);
+
+    try {
+      const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
+      await kirimEmailAksiAdmin({
+        aksi: 'Hapus Pembayaran SPP (Batch)',
+        deskripsi: `${orderedPayments.length} pembayaran SPP dibatalkan`,
+        detail: orderedPayments.map((p) => p.kode_invoice).join(', '),
+        adminNama: auth.user.nama_lengkap,
+        adminJabatan: auth.user.jabatan,
+        emailTujuan,
+      });
+    } catch (emailErr) {
+      console.error('Gagal kirim email salinan:', emailErr);
+    }
+
+    return NextResponse.json({
+      success: true,
+      pesan: `${orderedPayments.length} pembayaran berhasil dibatalkan`,
+      data: {
+        deleted_count: orderedPayments.length,
+        deleted_ids: orderedPayments.map((p) => p.id),
+      },
+    });
+  } catch (error) {
+    if (t) {
+      try {
+        await t.rollback();
+      } catch (_) {}
+    }
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ success: false, pesan: error.message }, { status: 400 });
+    }
+    console.error('Batch delete pembayaran error:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },
       { status: 500 }

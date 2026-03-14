@@ -30,6 +30,7 @@ function BayarPageInner() {
   const [paidPayments, setPaidPayments] = useState({});
   const [pin, setPin] = useState('');
   const [cancelModal, setCancelModal] = useState({ show: false, payment: null, bulan: null, cancelPin: '' });
+  const [selectedCancelBulan, setSelectedCancelBulan] = useState([]);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [canAbaikanNominal, setCanAbaikanNominal] = useState(false);
   const [sortSantri, setSortSantri] = useState('no_absen');
@@ -276,19 +277,33 @@ function BayarPageInner() {
   // ── Batalkan pembayaran ────────────────────────────────────────────────────
   const handleCancelPayment = async () => {
     if (!cancelModal.cancelPin) { setError('PIN wajib diisi'); return; }
+    const selectedIds = selectedCancelBulan
+      .map((bulan) => paidPayments[bulan]?.id)
+      .filter((id) => Number.isInteger(id));
+    if (selectedIds.length === 0) {
+      setError('Pilih minimal 1 pembayaran yang valid untuk dibatalkan');
+      return;
+    }
+
     setCancelLoading(true);
     setError('');
     try {
       const token = localStorage.getItem('auth_token');
-      const res  = await fetch(`/api/pembayaran/${cancelModal.payment.id}`, {
+      const isBatch = selectedIds.length > 1;
+      const res  = await fetch(isBatch ? '/api/pembayaran' : `/api/pembayaran/${selectedIds[0]}`, {
         method:  'DELETE',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ pin: cancelModal.cancelPin }),
+        body:    JSON.stringify(isBatch ? { ids: selectedIds, pin: cancelModal.cancelPin } : { pin: cancelModal.cancelPin }),
       });
       const data = await res.json();
       if (data.success) {
-        setSuccess(`Pembayaran bulan ${namaBulan[cancelModal.bulan - 1]} berhasil dibatalkan`);
+        if (selectedCancelBulan.length > 1) {
+          setSuccess(`${selectedCancelBulan.length} pembayaran berhasil dibatalkan`);
+        } else {
+          setSuccess(`Pembayaran bulan ${namaBulan[cancelModal.bulan - 1]} berhasil dibatalkan`);
+        }
         setCancelModal({ show: false, payment: null, bulan: null, cancelPin: '' });
+        setSelectedCancelBulan([]);
         await fetchStatusList(tahun, selectedSantri.id);
         await fetchPaidPayments(selectedSantri.id);
       } else {
@@ -564,7 +579,11 @@ function BayarPageInner() {
                   if (dibayar) {
                     return (
                       <button key={bulan}
-                        onClick={() => setCancelModal({ show: true, payment: paidPayments[bulan] || null, bulan, cancelPin: '' })}
+                        onClick={() => {
+                          const payment = paidPayments[bulan] || null;
+                          setSelectedCancelBulan([bulan]);
+                          setCancelModal({ show: true, payment, bulan, cancelPin: '' });
+                        }}
                         className="p-3 rounded-lg border-2 bg-green-100 border-green-300 text-green-700 text-center hover:bg-green-200 transition-colors"
                         title={`${nama} – Lunas. Klik untuk detail/batalkan`}>
                         <p className="text-sm font-medium">{nama.substring(0,3)}</p>
@@ -702,7 +721,11 @@ function BayarPageInner() {
                             <p className="text-xs text-green-600">{formatCurrency(payment.nominal)}</p>
                           </div>
                           <button
-                            onClick={() => setCancelModal({ show: true, payment, bulan: parseInt(bulan), cancelPin: '' })}
+                            onClick={() => {
+                              const bulanInt = parseInt(bulan);
+                              setSelectedCancelBulan([bulanInt]);
+                              setCancelModal({ show: true, payment, bulan: bulanInt, cancelPin: '' });
+                            }}
                             className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded px-1.5 py-0.5 border border-red-200"
                           >
                             Batal
@@ -765,9 +788,38 @@ function BayarPageInner() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-2">Batalkan Pembayaran</h3>
+            <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-xs font-medium text-gray-600 mb-2">Pilih pembayaran yang ingin dibatalkan:</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                {Object.entries(paidPayments)
+                  .sort(([a],[b]) => parseInt(a)-parseInt(b))
+                  .map(([bulan, payment]) => {
+                    const bulanInt = parseInt(bulan);
+                    const checked = selectedCancelBulan.includes(bulanInt);
+                    return (
+                      <label key={bulan} className="flex items-center gap-1.5 text-xs border rounded px-2 py-1 bg-white cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            setSelectedCancelBulan((prev) => {
+                              if (e.target.checked) return [...prev, bulanInt].sort((x, y) => x - y);
+                              return prev.filter((b) => b !== bulanInt);
+                            });
+                          }}
+                        />
+                        <span className="font-medium text-gray-700">{namaBulan[bulanInt-1].substring(0,3)}</span>
+                        <span className="text-gray-500">{formatCurrency(payment.nominal)}</span>
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
             <div className="p-3 bg-red-50 rounded-lg mb-4">
               <p className="text-sm text-red-700">
-                Batalkan pembayaran bulan <strong>{cancelModal.bulan ? namaBulan[cancelModal.bulan-1] : ''}</strong>?
+                {selectedCancelBulan.length > 1
+                  ? <>Batalkan <strong>{selectedCancelBulan.length} pembayaran</strong> yang dipilih?</>
+                  : <>Batalkan pembayaran bulan <strong>{cancelModal.bulan ? namaBulan[cancelModal.bulan-1] : ''}</strong>?</>}
               </p>
               {cancelModal.payment && (
                 <div className="mt-2 text-xs text-red-600 space-y-0.5">
@@ -785,8 +837,8 @@ function BayarPageInner() {
               onKeyDown={(e) => { if (e.key==='Enter' && cancelModal.cancelPin && !cancelLoading) handleCancelPayment(); }}
               placeholder="Masukkan PIN Anda" className="input-field mb-4" maxLength={8} autoFocus />
             <div className="flex gap-3">
-              <button onClick={() => setCancelModal({ show: false, payment: null, bulan: null, cancelPin: '' })} className="btn-secondary flex-1">Tidak</button>
-              <button onClick={handleCancelPayment} disabled={cancelLoading||!cancelModal.cancelPin} className="btn-danger flex-1">
+              <button onClick={() => { setCancelModal({ show: false, payment: null, bulan: null, cancelPin: '' }); setSelectedCancelBulan([]); }} className="btn-secondary flex-1">Tidak</button>
+              <button onClick={handleCancelPayment} disabled={cancelLoading||!cancelModal.cancelPin||selectedCancelBulan.length===0} className="btn-danger flex-1">
                 {cancelLoading ? 'Membatalkan...' : 'Ya, Batalkan'}
               </button>
             </div>
