@@ -68,6 +68,14 @@ async function ensureAuditColumnsForAllTables() {
       });
       addedCount += 1;
     }
+
+    // Pastikan perilaku auto di level database tetap konsisten di semua tabel.
+    await sequelize.query(`
+      ALTER TABLE \`${tableName}\`
+      MODIFY COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      MODIFY COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      MODIFY COLUMN deleted_at DATETIME NULL DEFAULT NULL
+    `);
   }
 
   console.log(`✅ Audit kolom disinkronkan (total kolom ditambahkan: ${addedCount})`);
@@ -92,6 +100,10 @@ async function migrate() {
       UPDATE jurnal_kas
       SET tanggal_aksi = tgl_transaksi
       WHERE tanggal_aksi IS NULL
+    `);
+    await sequelize.query(`
+      ALTER TABLE jurnal_kas
+      MODIFY COLUMN tanggal_aksi DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     `);
     console.log('✅ Kolom tanggal_aksi jurnal_kas berhasil disinkronkan dari tgl_transaksi');
 

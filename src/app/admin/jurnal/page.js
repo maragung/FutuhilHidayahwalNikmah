@@ -164,7 +164,6 @@ export default function JurnalPage() {
       <div className="card">
         <div className="mb-4">
           <h3 className="font-semibold text-gray-800">Transaksi Jurnal Kas</h3>
-          <p className="text-xs text-gray-500 mt-1">Kolom Tanggal menampilkan tanggal aksi transaksi.</p>
         </div>
         
         {loading ? (
