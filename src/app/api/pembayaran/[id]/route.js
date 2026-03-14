@@ -44,7 +44,12 @@ export async function PUT(request, { params }) {
     const auth = await verifyAuth(request);
     if (!auth.success) return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
 
-    const body = await request.json();
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
     const pinCheck = await verifyPin(auth.user.id, body.pin);
     if (!pinCheck.ok) return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
 
@@ -132,7 +137,12 @@ export async function DELETE(request, { params }) {
     const auth = await verifyAuth(request);
     if (!auth.success) return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
 
-    const body = await request.json();
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
     const pinCheck = await verifyPin(auth.user.id, body.pin);
     if (!pinCheck.ok) return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
 

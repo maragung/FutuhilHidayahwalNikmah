@@ -289,11 +289,10 @@ function BayarPageInner() {
     setError('');
     try {
       const token = localStorage.getItem('auth_token');
-      const isBatch = selectedIds.length > 1;
-      const res  = await fetch(isBatch ? '/api/pembayaran' : `/api/pembayaran/${selectedIds[0]}`, {
+      const res  = await fetch('/api/pembayaran', {
         method:  'DELETE',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify(isBatch ? { ids: selectedIds, pin: cancelModal.cancelPin } : { pin: cancelModal.cancelPin }),
+        body:    JSON.stringify({ ids: selectedIds, pin: cancelModal.cancelPin }),
       });
       const data = await res.json();
       if (data.success) {
@@ -333,6 +332,31 @@ function BayarPageInner() {
   const totalBayar     = selectedBulan.length * nominal;
   const earliestUnpaid = getEarliestUnpaid();
   const bulanMulai     = getBulanMulai();
+  const paidMonthsDesc = Object.keys(paidPayments)
+    .map((b) => parseInt(b, 10))
+    .filter((b) => Number.isInteger(b) && b >= 1 && b <= 12)
+    .sort((a, b) => b - a);
+
+  const isCancelSelectionAllowed = (bulan) => {
+    if (!paidMonthsDesc.length) return false;
+    const nextIndex = selectedCancelBulan.length;
+    return paidMonthsDesc[nextIndex] === bulan;
+  };
+
+  const toggleCancelBulan = (bulan, checked) => {
+    setSelectedCancelBulan((prev) => {
+      if (checked) {
+        const nextIndex = prev.length;
+        if (paidMonthsDesc[nextIndex] !== bulan) return prev;
+        return [...prev, bulan];
+      }
+
+      // Hanya boleh lepas centang paling akhir (LIFO)
+      if (prev.length === 0) return prev;
+      if (prev[prev.length - 1] !== bulan) return prev;
+      return prev.slice(0, -1);
+    });
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -579,13 +603,8 @@ function BayarPageInner() {
                   if (dibayar) {
                     return (
                       <button key={bulan}
-                        onClick={() => {
-                          const payment = paidPayments[bulan] || null;
-                          setSelectedCancelBulan([bulan]);
-                          setCancelModal({ show: true, payment, bulan, cancelPin: '' });
-                        }}
                         className="p-3 rounded-lg border-2 bg-green-100 border-green-300 text-green-700 text-center hover:bg-green-200 transition-colors"
-                        title={`${nama} – Lunas. Klik untuk detail/batalkan`}>
+                        title={`${nama} – Lunas`}>
                         <p className="text-sm font-medium">{nama.substring(0,3)}</p>
                         <svg className="w-4 h-4 mx-auto mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -705,34 +724,51 @@ function BayarPageInner() {
               {/* Daftar batalkan pembayaran */}
               {Object.keys(paidPayments).length > 0 && (
                 <div className="mt-6 pt-4 border-t border-gray-200">
-                  <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2 text-sm">
+                    <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2 text-sm">
                     <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                     Batalkan Pembayaran
                   </h4>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Centang dari bulan terakhir yang dibayar, satu per satu.
+                  </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {Object.entries(paidPayments)
-                      .sort(([a],[b]) => parseInt(a)-parseInt(b))
+                      .sort(([a],[b]) => parseInt(b)-parseInt(a))
                       .map(([bulan, payment]) => (
-                        <div key={bulan} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-200">
+                        <label key={bulan} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-200 cursor-pointer">
                           <div>
                             <p className="text-xs font-medium text-green-800">{namaBulan[parseInt(bulan)-1]}</p>
                             <p className="text-xs text-green-600">{formatCurrency(payment.nominal)}</p>
                           </div>
-                          <button
-                            onClick={() => {
-                              const bulanInt = parseInt(bulan);
-                              setSelectedCancelBulan([bulanInt]);
-                              setCancelModal({ show: true, payment, bulan: bulanInt, cancelPin: '' });
-                            }}
-                            className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded px-1.5 py-0.5 border border-red-200"
-                          >
-                            Batal
-                          </button>
-                        </div>
+                          <input
+                            type="checkbox"
+                            checked={selectedCancelBulan.includes(parseInt(bulan, 10))}
+                            disabled={
+                              !selectedCancelBulan.includes(parseInt(bulan, 10)) &&
+                              !isCancelSelectionAllowed(parseInt(bulan, 10))
+                            }
+                            onChange={(e) => toggleCancelBulan(parseInt(bulan, 10), e.target.checked)}
+                            className="w-4 h-4"
+                          />
+                        </label>
                       ))}
                   </div>
+                  {selectedCancelBulan.length > 0 && (
+                    <div className="mt-3">
+                      <button
+                        onClick={() => {
+                          const bulan = selectedCancelBulan[0] || null;
+                          const payment = bulan ? paidPayments[bulan] || null : null;
+                          setCancelModal({ show: true, payment, bulan, cancelPin: '' });
+                        }}
+                        className="btn-danger w-full"
+                      >
+                        Batalkan Pembayaran ({selectedCancelBulan.length} bulan)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -789,31 +825,12 @@ function BayarPageInner() {
           <div className="bg-white rounded-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-2">Batalkan Pembayaran</h3>
             <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-xs font-medium text-gray-600 mb-2">Pilih pembayaran yang ingin dibatalkan:</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                {Object.entries(paidPayments)
-                  .sort(([a],[b]) => parseInt(a)-parseInt(b))
-                  .map(([bulan, payment]) => {
-                    const bulanInt = parseInt(bulan);
-                    const checked = selectedCancelBulan.includes(bulanInt);
-                    return (
-                      <label key={bulan} className="flex items-center gap-1.5 text-xs border rounded px-2 py-1 bg-white cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            setSelectedCancelBulan((prev) => {
-                              if (e.target.checked) return [...prev, bulanInt].sort((x, y) => x - y);
-                              return prev.filter((b) => b !== bulanInt);
-                            });
-                          }}
-                        />
-                        <span className="font-medium text-gray-700">{namaBulan[bulanInt-1].substring(0,3)}</span>
-                        <span className="text-gray-500">{formatCurrency(payment.nominal)}</span>
-                      </label>
-                    );
-                  })}
-              </div>
+              <p className="text-xs font-medium text-gray-600 mb-1">Bulan terpilih untuk dibatalkan:</p>
+              <p className="text-sm text-gray-800 font-semibold">
+                {selectedCancelBulan
+                  .map((b) => namaBulan[b - 1])
+                  .join(', ')}
+              </p>
             </div>
             <div className="p-3 bg-red-50 rounded-lg mb-4">
               <p className="text-sm text-red-700">

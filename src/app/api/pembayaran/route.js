@@ -396,7 +396,12 @@ export async function DELETE(request) {
       );
     }
 
-    const body = await request.json();
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
     const ids = [...new Set(ensureArray(body?.ids, 'Daftar pembayaran').map((id) => Number.parseInt(id, 10)))].filter(
       (id) => Number.isInteger(id) && id > 0
     );
