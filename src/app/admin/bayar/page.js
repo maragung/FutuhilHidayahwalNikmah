@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { safeHexColor } from '@/lib/color';
 import { createIdempotencyKey } from '@/lib/client-idempotency';
@@ -16,6 +16,7 @@ function BayarPageInner() {
   const TAHUN_STORAGE_KEY = 'bayar_spp_selected_tahun';
 
   const [statusLoading, setStatusLoading] = useState(false);
+  const [refreshingSantri, setRefreshingSantri] = useState(false);
   const [statusList, setStatusList] = useState([]);
   const [selectedSantri, setSelectedSantri] = useState(null);
   const [search, setSearch] = useState('');
@@ -45,6 +46,7 @@ function BayarPageInner() {
 
   const namaBulan = ['Januari','Februari','Maret','April','Mei','Juni',
                      'Juli','Agustus','September','Oktober','November','Desember'];
+  const statusRequestSeq = useRef(0);
   const warnaNonSubsidi = safeHexColor(settings.warna_non_subsidi, '#04B816');
   const warnaSubsidi    = safeHexColor(settings.warna_subsidi,     '#045EB8');
 
@@ -105,14 +107,18 @@ function BayarPageInner() {
   // ── Fetch status pembayaran (menggantikan /api/santri?status=aktif) ────────
   // Endpoint ini menghitung bulan_status di sisi server berdasarkan tgl_mendaftar,
   // tgl_nonaktif, dll. – sehingga "mulai dari bulan mendaftar" selalu tepat.
-  const fetchStatusList = async (selectedTahun, keepSelected) => {
+  const fetchStatusList = async (selectedTahun, keepSelected, options = {}) => {
+    const { manual = false } = options;
     const token = localStorage.getItem('auth_token');
+    const requestId = ++statusRequestSeq.current;
     setStatusLoading(true);
+    if (manual) setRefreshingSantri(true);
     try {
       const res  = await fetch(`/api/pembayaran/status?tahun=${selectedTahun}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
+      if (requestId !== statusRequestSeq.current) return;
       if (data.success) {
         const list = data.data;
         setStatusList(list);
@@ -123,6 +129,7 @@ function BayarPageInner() {
           if (updated) {
             setSelectedSantri(updated);
             if (!abaikanAturanNominal) setNominal(updated.nominal_spp || 0);
+            fetchPaidPayments(updated.id, selectedTahun);
           }
         } else if (santriIdParam) {
           const found = list.find(s => s.id === parseInt(santriIdParam));
@@ -136,7 +143,10 @@ function BayarPageInner() {
     } catch {
       setError('Gagal memuat data santri');
     } finally {
-      setStatusLoading(false);
+      if (requestId === statusRequestSeq.current) {
+        setStatusLoading(false);
+        if (manual) setRefreshingSantri(false);
+      }
     }
   };
 
@@ -286,7 +296,7 @@ function BayarPageInner() {
         setSelectedBulan([]);
         setPin('');
         await fetchStatusList(tahun, selectedSantri.id);
-        await fetchPaidPayments(selectedSantri.id);
+        await fetchPaidPayments(selectedSantri.id, tahun);
       } else {
         setError(data.pesan);
       }
@@ -327,7 +337,7 @@ function BayarPageInner() {
         setCancelModal({ show: false, payment: null, bulan: null, cancelPin: '' });
         setSelectedCancelBulan([]);
         await fetchStatusList(tahun, selectedSantri.id);
-        await fetchPaidPayments(selectedSantri.id);
+        await fetchPaidPayments(selectedSantri.id, tahun);
       } else {
         setError(data.pesan || 'Gagal membatalkan pembayaran');
       }
@@ -410,14 +420,36 @@ function BayarPageInner() {
         <div className="card lg:col-span-1">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-gray-800">1. Pilih Santri</h3>
-            <select
-              value={tahun}
-              onChange={(e) => { setTahun(parseInt(e.target.value)); setSelectedBulan([]); setPaidPayments({}); }}
-              title="Pilih tahun pembayaran"
-              className="input-field w-auto text-sm py-1"
-            >
-              {getYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={tahun}
+                onChange={(e) => {
+                  const selectedYear = parseInt(e.target.value, 10);
+                  setTahun(selectedYear);
+                  setSelectedBulan([]);
+                  setPaidPayments({});
+                }}
+                title="Pilih tahun pembayaran"
+                className="input-field w-auto text-sm py-1"
+              >
+                {getYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBulan([]);
+                  setPaidPayments({});
+                  fetchStatusList(tahun, selectedSantri?.id, { manual: true });
+                }}
+                title="Refresh data santri sesuai tahun terpilih"
+                className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                disabled={statusLoading || refreshingSantri}
+              >
+                <svg className={`w-4 h-4 ${(statusLoading || refreshingSantri) ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <input
@@ -475,7 +507,7 @@ function BayarPageInner() {
                       setSelectedBulan([]);
                       setPaidPayments({});
                       if (!abaikanAturanNominal) setNominal(santri.nominal_spp || 0);
-                      fetchPaidPayments(santri.id);
+                      fetchPaidPayments(santri.id, tahun);
                     }}
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
                       selectedSantri?.id === santri.id
