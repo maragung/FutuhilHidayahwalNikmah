@@ -11,7 +11,9 @@
     "db:migrate": "node src/lib/migrate.js",
     "db:seed": "node src/lib/seed.js",
     "db:check": "node src/lib/db-check.js",
-    "db:repair:spp-dates": "node src/lib/repair-spp-transaction-dates.js"
+    "db:repair:spp-dates": "node src/lib/repair-spp-transaction-dates.js",
+    "db:migrate:kode-transaksi": "node src/lib/migrate-kode-transaksi-format.js",
+    "db:migrate:kode-transaksi:apply": "node src/lib/migrate-kode-transaksi-format.js --apply"
   },
   "engines": {
   "node": ">=20 <=24"

@@ -36,13 +36,28 @@ export async function createBackup(aksi, tabel, dataSebelum, dataSesudah, adminI
   }
 }
 
+const kodeMinuteCounter = new Map();
+
 export function generateKodeInvoice(prefix = 'SPP') {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  const timestamp = Date.now().toString().slice(-4);
-  return `${prefix}-${year}${month}-${timestamp}${random}`;
+  const day = String(now.getDate()).padStart(2, '0');
+  const hour = String(now.getHours()).padStart(2, '0');
+  const minute = String(now.getMinutes()).padStart(2, '0');
+  const timePart = `${year}${month}${day}-${hour}${minute}`;
+  const key = `${prefix}-${timePart}`;
+
+  const count = (kodeMinuteCounter.get(key) || 0) + 1;
+  kodeMinuteCounter.set(key, count);
+
+  // Primary format: PREFIX-YYYYMMDD-HHMM.
+  // If multiple codes are created in the same minute, append -NN to keep uniqueness.
+  if (count === 1) {
+    return key;
+  }
+
+  return `${key}-${String(count).padStart(2, '0')}`;
 }
 
 export function resolveSppTransactionDate(tahunSpp, bulanSpp, fallbackDate = new Date()) {
