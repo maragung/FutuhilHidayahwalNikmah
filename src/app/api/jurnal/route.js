@@ -63,6 +63,7 @@ export async function GET(request) {
       return {
         ...data,
         tanggal_aksi: data.tanggal_aksi || data.tgl_transaksi,
+        tanggal: data.tanggal_aksi || data.tgl_transaksi,
         is_koreksi_spp: isKoreksiSPP,
       };
     });

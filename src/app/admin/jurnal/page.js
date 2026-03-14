@@ -201,7 +201,7 @@ export default function JurnalPage() {
                     jurnalList.map((jurnal) => (
                       <tr key={jurnal.id} className="table-row">
                         <td className="px-4 py-3 text-sm whitespace-nowrap">
-                          {formatDateTime(jurnal.tanggal_aksi || jurnal.tgl_transaksi)}
+                          {formatDateTime(jurnal.tanggal || jurnal.tanggal_aksi || jurnal.tgl_transaksi)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {isKoreksiSPP(jurnal) ? (
