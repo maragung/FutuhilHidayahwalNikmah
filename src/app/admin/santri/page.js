@@ -22,6 +22,7 @@ export default function DaftarSantriPage() {
   const [selectedJilid, setSelectedJilid] = useState([]);
   const [sortBy, setSortBy] = useState('no_absen');
   const [sortDir, setSortDir] = useState('asc');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailSantri, setDetailSantri] = useState(null);
@@ -315,76 +316,88 @@ export default function DaftarSantriPage() {
             </select>
           </div>
         </div>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2 items-center">
-            {[
-              { key: 'subsidi', label: 'Subsidi' },
-              { key: 'non_subsidi', label: 'Non Subsidi' },
-              { key: 'lunas', label: '✓ Lunas' },
-              { key: 'laki_laki', label: 'Laki-laki' },
-              { key: 'perempuan', label: 'Perempuan' },
-            ].map((chip) => {
-              const active = selectedKategori.includes(chip.key);
-              return (
-                <button
-                  key={chip.key}
-                  onClick={() => toggleKategori(chip.key)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
-                    active
-                      ? 'bg-green-600 text-white border-green-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
-                  }`}
-                >
-                  {chip.label}
-                </button>
-              );
-            })}
-            <button onClick={resetFilter} className="px-3 py-1 rounded-full text-sm font-medium border bg-white text-gray-500 border-gray-300 hover:border-red-300 hover:text-red-600">
-              Reset
-            </button>
-            <span className="ml-auto text-xs text-gray-500">{filteredData.length} santri</span>
-          </div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-gray-500">{filteredData.length} santri</span>
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters((prev) => !prev)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:border-green-400 hover:text-green-700"
+          >
+            {showAdvancedFilters ? 'Sembunyikan Menu Filter' : 'Tampilkan Menu Filter'}
+          </button>
+        </div>
 
-          {jilidList.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter Jilid (multi select)</p>
-              <div className="flex flex-wrap gap-2">
-                {jilidList.map((j) => {
-                  const active = selectedJilid.includes(j);
-                  return (
-                    <button
-                      key={j}
-                      onClick={() => toggleJilid(j)}
-                      className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
-                        active
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                      }`}
-                    >
-                      {j}
-                    </button>
-                  );
-                })}
+        {showAdvancedFilters && (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2 items-center">
+              {[
+                { key: 'subsidi', label: 'Subsidi' },
+                { key: 'non_subsidi', label: 'Non Subsidi' },
+                { key: 'lunas', label: '✓ Lunas' },
+                { key: 'laki_laki', label: 'Laki-laki' },
+                { key: 'perempuan', label: 'Perempuan' },
+              ].map((chip) => {
+                const active = selectedKategori.includes(chip.key);
+                return (
+                  <button
+                    key={chip.key}
+                    onClick={() => toggleKategori(chip.key)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
+                      active
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+              <button onClick={resetFilter} className="px-3 py-1 rounded-full text-sm font-medium border bg-white text-gray-500 border-gray-300 hover:border-red-300 hover:text-red-600">
+                Reset
+              </button>
+            </div>
+
+            {jilidList.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter Jilid (multi select)</p>
+                <div className="flex flex-wrap gap-2">
+                  {jilidList.map((j) => {
+                    const active = selectedJilid.includes(j);
+                    return (
+                      <button
+                        key={j}
+                        onClick={() => toggleJilid(j)}
+                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
+                          active
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                        }`}
+                      >
+                        {j}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="sm:w-52">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Sortir</label>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="input-field py-2 text-sm">
+                  {SORT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+              </div>
+              <div className="sm:w-44">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Arah</label>
+                <select value={sortDir} onChange={(e) => setSortDir(e.target.value)} className="input-field py-2 text-sm">
+                  <option value="asc">Naik</option>
+                  <option value="desc">Turun</option>
+                </select>
               </div>
             </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-            <div className="sm:w-52">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Sortir</label>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="input-field py-2 text-sm">
-                {SORT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-              </select>
-            </div>
-            <div className="sm:w-44">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Arah</label>
-              <select value={sortDir} onChange={(e) => setSortDir(e.target.value)} className="input-field py-2 text-sm">
-                <option value="asc">Naik</option>
-                <option value="desc">Turun</option>
-              </select>
-            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Table */}
