@@ -12,6 +12,9 @@ const {
   InfakSedekah,
   Pengeluaran,
   JurnalKas,
+  Absensi,
+  BukuPrestasiSantri,
+  Santri,
 } = require('./models');
 
 function rupiah(value) {
@@ -73,6 +76,36 @@ async function run() {
       critical.push(`Data pembayaran_lain yatim/orphan terdeteksi (${orphanPembayaranLain.length} baris sampel)`);
     }
 
+    const orphanAbsensi = await sequelize.query(
+      `
+      SELECT a.id
+      FROM absensi a
+      LEFT JOIN santri s ON s.id = a.santri_id
+      LEFT JOIN admins ad ON ad.id = a.admin_id
+      WHERE s.id IS NULL OR ad.id IS NULL
+      LIMIT 20
+      `,
+      { type: QueryTypes.SELECT }
+    );
+    if (orphanAbsensi.length > 0) {
+      critical.push(`Data absensi yatim/orphan terdeteksi (${orphanAbsensi.length} baris sampel)`);
+    }
+
+    const orphanPrestasi = await sequelize.query(
+      `
+      SELECT p.id
+      FROM buku_prestasi_santri p
+      LEFT JOIN santri s ON s.id = p.santri_id
+      LEFT JOIN admins ad ON ad.id = p.admin_id
+      WHERE s.id IS NULL OR ad.id IS NULL
+      LIMIT 20
+      `,
+      { type: QueryTypes.SELECT }
+    );
+    if (orphanPrestasi.length > 0) {
+      critical.push(`Data buku_prestasi_santri yatim/orphan terdeteksi (${orphanPrestasi.length} baris sampel)`);
+    }
+
     const nominalInvalid = {
       spp: await PembayaranSPP.count({ where: sequelize.where(sequelize.col('nominal'), '<=', 0) }),
       lain: await PembayaranLain.count({ where: sequelize.where(sequelize.col('nominal'), '<=', 0) }),
@@ -83,6 +116,20 @@ async function run() {
     const totalInvalidNominal = Object.values(nominalInvalid).reduce((sum, v) => sum + Number(v || 0), 0);
     if (totalInvalidNominal > 0) {
       critical.push(`Nominal <= 0 terdeteksi pada transaksi (${totalInvalidNominal} baris)`);
+    }
+
+    const invalidNikCount = await Santri.count({
+      where: sequelize.where(sequelize.col('nik'), 'NOT REGEXP', '^[0-9]{16}$'),
+    });
+    if (invalidNikCount > 0) {
+      warnings.push(`Format NIK tidak valid terdeteksi pada data santri (${invalidNikCount} baris)`);
+    }
+
+    const invalidNoAbsenCount = await Santri.count({
+      where: sequelize.where(sequelize.col('no_absen'), '<=', 0),
+    });
+    if (invalidNoAbsenCount > 0) {
+      warnings.push(`No. absen <= 0 terdeteksi pada data santri (${invalidNoAbsenCount} baris)`);
     }
 
     const totalMasuk = Number(await JurnalKas.sum('nominal', { where: { jenis: 'Masuk' } }) || 0);

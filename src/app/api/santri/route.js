@@ -119,6 +119,13 @@ export async function POST(request) {
       );
     }
 
+    if (!/^\d{16}$/.test(String(nik))) {
+      return NextResponse.json(
+        { success: false, pesan: 'NIK harus terdiri dari 16 digit angka' },
+        { status: 400 }
+      );
+    }
+
     if (!jenis_kelamin || !JENIS_KELAMIN_OPTIONS.includes(jenis_kelamin)) {
       return NextResponse.json(
         { success: false, pesan: 'Jenis kelamin wajib dipilih' },
@@ -180,6 +187,12 @@ export async function POST(request) {
       data: santri,
     }, { status: 201 });
   } catch (error) {
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      return NextResponse.json(
+        { success: false, pesan: 'NIK sudah terdaftar' },
+        { status: 409 }
+      );
+    }
     console.error('Create santri error:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },
