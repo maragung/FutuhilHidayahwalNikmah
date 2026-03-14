@@ -25,6 +25,16 @@ async function verifyAdminPin(adminId, pin) {
   return { success: true, admin };
 }
 
+function buildSafeJurnalRef(prefix, kodeInvoice, id) {
+  const raw = `${prefix}-${String(kodeInvoice || '').replace(/\s+/g, '')}`;
+  if (raw.length <= 20) return raw;
+
+  const fallback = `${prefix}-${id}`;
+  if (fallback.length <= 20) return fallback;
+
+  return fallback.slice(0, 20);
+}
+
 // GET - Ambil semua pembayaran
 export async function GET(request) {
   try {
@@ -423,12 +433,13 @@ export async function DELETE(request) {
       lock: t.LOCK.UPDATE,
     });
 
-    if (pembayaranList.length !== ids.length) {
-      const foundIds = new Set(pembayaranList.map((p) => Number(p.id)));
-      const missingIds = ids.filter((id) => !foundIds.has(id));
+    const foundIds = new Set(pembayaranList.map((p) => Number(p.id)));
+    const missingIds = ids.filter((id) => !foundIds.has(id));
+
+    if (pembayaranList.length === 0) {
       await t.rollback();
       return NextResponse.json(
-        { success: false, pesan: `Data pembayaran tidak ditemukan untuk id: ${missingIds.join(', ')}` },
+        { success: false, pesan: 'Data pembayaran tidak ditemukan' },
         { status: 404 }
       );
     }
@@ -462,7 +473,7 @@ export async function DELETE(request) {
           tgl_transaksi: tanggalTransaksi,
           jenis: 'Keluar',
           nominal,
-          referensi_kode: `REV-${pembayaran.kode_invoice}`,
+          referensi_kode: buildSafeJurnalRef('REV', pembayaran.kode_invoice, pembayaran.id),
           keterangan: `Pembatalan pembayaran ${pembayaran.kode_invoice}`,
           saldo_berjalan: saldoBerjalan,
           admin_id: auth.user.id,
@@ -493,10 +504,13 @@ export async function DELETE(request) {
 
     return NextResponse.json({
       success: true,
-      pesan: `${orderedPayments.length} pembayaran berhasil dibatalkan`,
+      pesan: missingIds.length > 0
+        ? `${orderedPayments.length} pembayaran berhasil dibatalkan (${missingIds.length} data sudah tidak tersedia)`
+        : `${orderedPayments.length} pembayaran berhasil dibatalkan`,
       data: {
         deleted_count: orderedPayments.length,
         deleted_ids: orderedPayments.map((p) => p.id),
+        missing_ids: missingIds,
       },
     });
   } catch (error) {

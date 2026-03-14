@@ -14,6 +14,16 @@ async function verifyPin(authUserId, pin) {
   return { ok: true, admin };
 }
 
+function buildSafeJurnalRef(prefix, kodeInvoice, id) {
+  const raw = `${prefix}-${String(kodeInvoice || '').replace(/\s+/g, '')}`;
+  if (raw.length <= 20) return raw;
+
+  const fallback = `${prefix}-${id}`;
+  if (fallback.length <= 20) return fallback;
+
+  return fallback.slice(0, 20);
+}
+
 export async function GET(request, { params }) {
   try {
     await sequelize.authenticate();
@@ -93,7 +103,7 @@ export async function PUT(request, { params }) {
         tgl_transaksi: updateData.tgl_bayar,
         jenis: selisih > 0 ? 'Masuk' : 'Keluar',
         nominal: Math.abs(selisih),
-        referensi_kode: `ADJ-${pembayaran.kode_invoice}`,
+        referensi_kode: buildSafeJurnalRef('ADJ', pembayaran.kode_invoice, pembayaran.id),
         keterangan: `Penyesuaian nominal pembayaran ${pembayaran.kode_invoice}`,
         saldo_berjalan: saldoTerakhir + selisih,
         admin_id: auth.user.id,
@@ -165,7 +175,7 @@ export async function DELETE(request, { params }) {
       tgl_transaksi: tanggalTransaksi,
       jenis: 'Keluar',
       nominal: Number(pembayaran.nominal),
-      referensi_kode: `REV-${pembayaran.kode_invoice}`,
+      referensi_kode: buildSafeJurnalRef('REV', pembayaran.kode_invoice, pembayaran.id),
       keterangan: `Pembatalan pembayaran ${pembayaran.kode_invoice}`,
       saldo_berjalan: saldoTerakhir - Number(pembayaran.nominal),
       admin_id: auth.user.id,
