@@ -411,18 +411,15 @@ function BayarPageInner() {
             <select
               value={tahun}
               onChange={(e) => { setTahun(parseInt(e.target.value)); setSelectedBulan([]); setPaidPayments({}); }}
-              disabled={!!selectedSantri}
-              title={selectedSantri ? 'Tahun dikunci saat santri sudah dipilih' : 'Pilih tahun pembayaran'}
-              className={`input-field w-auto text-sm py-1 ${selectedSantri ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+              title="Pilih tahun pembayaran"
+              className="input-field w-auto text-sm py-1"
             >
               {getYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-          {selectedSantri && (
-            <p className="text-xs text-amber-600 mb-2">
-              Tahun dikunci selama santri terpilih untuk mencegah salah input.
-            </p>
-          )}
+          <p className="text-xs text-gray-500 mb-2">
+            Pilihan tahun disimpan otomatis dan tetap sama setelah halaman direfresh.
+          </p>
 
           <input
             type="text"
