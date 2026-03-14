@@ -153,6 +153,7 @@ export async function POST(request) {
 
       await JurnalKas.create({
         tgl_transaksi: new Date(),
+        tanggal_aksi: new Date(),
         jenis: 'Masuk',
         nominal: nominalFinal,
         referensi_kode: kodeInvoice,

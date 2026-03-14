@@ -28,6 +28,13 @@ async function migrate() {
     console.log('✅ Semua tabel berhasil dibuat/diupdate!');
     console.log('   • Kolom no_absen tersedia di tabel santri (nullable, integer)');
 
+    await sequelize.query(`
+      UPDATE jurnal_kas
+      SET tanggal_aksi = tgl_transaksi
+      WHERE tanggal_aksi IS NULL
+    `);
+    console.log('✅ Kolom tanggal_aksi jurnal_kas berhasil disinkronkan dari tgl_transaksi');
+
     // Sinkronkan role default sistem untuk instalasi baru maupun lama
     for (const role of ROLES_DEFAULT) {
       const existingRole = await Role.findOne({ where: { id: role.id } });

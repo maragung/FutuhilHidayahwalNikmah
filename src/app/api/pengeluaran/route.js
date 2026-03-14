@@ -167,6 +167,7 @@ export async function POST(request) {
     // Catat ke jurnal kas
     await JurnalKas.create({
       tgl_transaksi: tanggalKeluar,
+      tanggal_aksi: tanggalKeluar,
       jenis: 'Keluar',
       nominal: nominalValue,
       referensi_kode: kodePengeluaran,

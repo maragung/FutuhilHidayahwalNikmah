@@ -89,6 +89,7 @@ export async function PUT(request, { params }) {
 
     await JurnalKas.update({
       tgl_transaksi: updateData.tgl_bayar,
+      tanggal_aksi: updateData.tgl_bayar,
       keterangan: `SPP ${pembayaran.santri_id} - Bulan ${updateData.bulan_spp}/${updateData.tahun_spp}`,
     }, {
       where: { referensi_kode: pembayaran.kode_invoice },
@@ -101,6 +102,7 @@ export async function PUT(request, { params }) {
       const saldoTerakhir = lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0;
       await JurnalKas.create({
         tgl_transaksi: updateData.tgl_bayar,
+        tanggal_aksi: updateData.tgl_bayar,
         jenis: selisih > 0 ? 'Masuk' : 'Keluar',
         nominal: Math.abs(selisih),
         referensi_kode: buildSafeJurnalRef('ADJ', pembayaran.kode_invoice, pembayaran.id),
@@ -173,6 +175,7 @@ export async function DELETE(request, { params }) {
 
     await JurnalKas.create({
       tgl_transaksi: tanggalTransaksi,
+      tanggal_aksi: tanggalTransaksi,
       jenis: 'Keluar',
       nominal: Number(pembayaran.nominal),
       referensi_kode: buildSafeJurnalRef('REV', pembayaran.kode_invoice, pembayaran.id),

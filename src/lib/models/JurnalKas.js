@@ -12,6 +12,10 @@ const JurnalKas = sequelize.define('JurnalKas', {
     allowNull: false,
     defaultValue: DataTypes.NOW,
   },
+  tanggal_aksi: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
   jenis: {
     type: DataTypes.ENUM('Masuk', 'Keluar'),
     allowNull: false,

@@ -317,6 +317,7 @@ export async function POST(request) {
       // Catat ke jurnal kas
       await JurnalKas.create({
         tgl_transaksi: tanggalTransaksi,
+        tanggal_aksi: tanggalTransaksi,
         jenis: 'Masuk',
         nominal: nominalPerBulan,
         referensi_kode: kodeInvoice,
@@ -473,6 +474,7 @@ export async function DELETE(request) {
       await JurnalKas.create(
         {
           tgl_transaksi: tanggalTransaksi,
+          tanggal_aksi: tanggalTransaksi,
           jenis: 'Keluar',
           nominal,
           referensi_kode: buildSafeJurnalRef('REV', pembayaran.kode_invoice, pembayaran.id),

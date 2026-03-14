@@ -30,11 +30,11 @@ export async function GET(request) {
     if (tahun && bulan) {
       const startDate = new Date(tahun, bulan - 1, 1);
       const endDate = new Date(tahun, bulan, 0, 23, 59, 59);
-      where.tgl_transaksi = { [Op.between]: [startDate, endDate] };
+      where.tanggal_aksi = { [Op.between]: [startDate, endDate] };
     } else if (tahun) {
       const startDate = new Date(tahun, 0, 1);
       const endDate = new Date(tahun, 11, 31, 23, 59, 59);
-      where.tgl_transaksi = { [Op.between]: [startDate, endDate] };
+      where.tanggal_aksi = { [Op.between]: [startDate, endDate] };
     }
     
     if (jenis) {
@@ -46,7 +46,7 @@ export async function GET(request) {
       include: [
         { model: Admin, as: 'admin', attributes: ['nama_lengkap'] },
       ],
-      order: [['tgl_transaksi', 'DESC'], ['id', 'DESC']],
+      order: [['tanggal_aksi', 'DESC'], ['id', 'DESC']],
       limit,
       offset,
     });
@@ -62,6 +62,7 @@ export async function GET(request) {
 
       return {
         ...data,
+        tanggal_aksi: data.tanggal_aksi || data.tgl_transaksi,
         is_koreksi_spp: isKoreksiSPP,
       };
     });

@@ -414,7 +414,7 @@ export async function GET(request) {
           order: [['tgl_transaksi', 'ASC'], ['id', 'ASC']],
         });
         data = data.map(j => ({
-          tanggal: j.tgl_transaksi,
+          tanggal: j.tanggal_aksi || j.tgl_transaksi,
           jenis: j.jenis,
           kode_referensi: j.referensi_kode,
           keterangan: j.keterangan,

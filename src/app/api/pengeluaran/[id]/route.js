@@ -52,6 +52,7 @@ export async function PUT(request, { params }) {
       const saldo = (lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0) - diff;
       await JurnalKas.create({
         tgl_transaksi: new Date(),
+        tanggal_aksi: new Date(),
         jenis: diff >= 0 ? 'Keluar' : 'Masuk',
         nominal: Math.abs(diff),
         referensi_kode: `ADJ-${pengeluaran.kode_pengeluaran}`,
@@ -112,6 +113,7 @@ export async function DELETE(request, { params }) {
 
     await JurnalKas.create({
       tgl_transaksi: new Date(),
+      tanggal_aksi: new Date(),
       jenis: 'Masuk',
       nominal: Number(pengeluaran.nominal),
       referensi_kode: `REV-${pengeluaran.kode_pengeluaran}`,

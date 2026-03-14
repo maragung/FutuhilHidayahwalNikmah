@@ -162,7 +162,10 @@ export default function JurnalPage() {
 
       {/* Tabel Jurnal */}
       <div className="card">
-        <h3 className="font-semibold text-gray-800 mb-4">Transaksi Jurnal Kas</h3>
+        <div className="mb-4">
+          <h3 className="font-semibold text-gray-800">Transaksi Jurnal Kas</h3>
+          <p className="text-xs text-gray-500 mt-1">Kolom Tanggal menampilkan tanggal aksi transaksi.</p>
+        </div>
         
         {loading ? (
           <div className="flex justify-center py-8">
@@ -198,7 +201,7 @@ export default function JurnalPage() {
                     jurnalList.map((jurnal) => (
                       <tr key={jurnal.id} className="table-row">
                         <td className="px-4 py-3 text-sm whitespace-nowrap">
-                          {formatDateTime(jurnal.tgl_transaksi)}
+                          {formatDateTime(jurnal.tanggal_aksi || jurnal.tgl_transaksi)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {isKoreksiSPP(jurnal) ? (
