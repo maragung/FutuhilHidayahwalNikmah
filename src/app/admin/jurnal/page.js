@@ -163,9 +163,6 @@ export default function JurnalPage() {
       {/* Tabel Jurnal */}
       <div className="card">
         <h3 className="font-semibold text-gray-800 mb-4">Transaksi Jurnal Kas</h3>
-        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-          Transaksi <strong>Koreksi SPP</strong> adalah pembatalan pembayaran SPP, bukan pengeluaran operasional.
-        </div>
         
         {loading ? (
           <div className="flex justify-center py-8">

@@ -81,12 +81,40 @@ export async function GET(request) {
           });
         }
 
+        const pembayaranNominalRows = await PembayaranSPP.findAll({
+          where: { tahun_spp: tahun },
+          attributes: ['santri_id', 'bulan_spp', [sequelize.fn('SUM', sequelize.col('nominal')), 'total_nominal']],
+          group: ['santri_id', 'bulan_spp'],
+          raw: true,
+        });
+
+        const nominalMap = {};
+        pembayaranNominalRows.forEach((row) => {
+          const sid = Number.parseInt(row.santri_id, 10);
+          const bulanKe = Number.parseInt(row.bulan_spp, 10);
+          const nominalTotal = Number.parseFloat(row.total_nominal || 0) || 0;
+          if (!nominalMap[sid]) nominalMap[sid] = {};
+          nominalMap[sid][bulanKe] = nominalTotal;
+        });
+
         data = santriRows.map((s) => ({
           ...s,
           kategori_subsidi: s.is_subsidi ? 'Subsidi' : 'Non Subsidi',
           nik: includeNik ? s.nik : '',
           email_wali: includeEmail ? s.email_wali : '',
           no_telp_wali: includePhone ? s.no_telp_wali : '',
+          setor_jan: nominalMap[s.id]?.[1] || 0,
+          setor_feb: nominalMap[s.id]?.[2] || 0,
+          setor_mar: nominalMap[s.id]?.[3] || 0,
+          setor_apr: nominalMap[s.id]?.[4] || 0,
+          setor_mei: nominalMap[s.id]?.[5] || 0,
+          setor_jun: nominalMap[s.id]?.[6] || 0,
+          setor_jul: nominalMap[s.id]?.[7] || 0,
+          setor_agu: nominalMap[s.id]?.[8] || 0,
+          setor_sep: nominalMap[s.id]?.[9] || 0,
+          setor_okt: nominalMap[s.id]?.[10] || 0,
+          setor_nov: nominalMap[s.id]?.[11] || 0,
+          setor_des: nominalMap[s.id]?.[12] || 0,
         }));
         break;
       }

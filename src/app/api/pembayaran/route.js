@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/auth';
 import { PembayaranSPP, Santri, Admin, JurnalKas, Pengaturan, Log } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
-import { createBackup, generateKodeInvoice, resolveSppTransactionDate } from '@/lib/utils';
+import { createBackup, generateKodeInvoice, getClientTimeConfig, resolveSppTransactionDate } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
 import { ValidationError, ensureArray, readEnumValue, readOptionalText, readPositiveInteger } from '@/lib/request-validation';
@@ -291,8 +291,10 @@ export async function POST(request) {
     });
     let saldoBerjalan = lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0;
     
+    const timeConfig = getClientTimeConfig(request);
+
     for (const bulan of bulanList) {
-      const kodeInvoice = generateKodeInvoice('SPP');
+      const kodeInvoice = generateKodeInvoice('SPP', timeConfig);
       const tanggalTransaksi = resolveSppTransactionDate(tahunInt, bulan);
       
       const pembayaran = await PembayaranSPP.create({

@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/auth';
 import { PembayaranLain, Santri, Kegiatan, Admin, JurnalKas } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
-import { createBackup, generateKodeInvoice } from '@/lib/utils';
+import { createBackup, generateKodeInvoice, getClientTimeConfig } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
 import { ValidationError, readEnumValue, readOptionalText, readPositiveAmount, readPositiveInteger } from '@/lib/request-validation';
@@ -133,7 +133,7 @@ export async function POST(request) {
     }
 
     t = await sequelize.transaction();
-    const kodeInvoice = generateKodeInvoice('PBL');
+    const kodeInvoice = generateKodeInvoice('PBL', getClientTimeConfig(request));
 
     const pembayaran = await PembayaranLain.create({
       kode_invoice: kodeInvoice,

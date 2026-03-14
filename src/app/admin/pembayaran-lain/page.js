@@ -247,7 +247,13 @@ export default function PembayaranLainPage() {
     try {
       const res = await fetch('/api/pembayaran-lain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-idempotency-key': createIdempotencyKey('pbl') },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-client-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+          'x-client-tz-offset': String(-new Date().getTimezoneOffset()),
+          'x-idempotency-key': createIdempotencyKey('pbl')
+        },
         body: JSON.stringify({ ...payForm, pin })
       });
       const data = await res.json();

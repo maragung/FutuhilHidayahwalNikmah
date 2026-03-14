@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/auth';
 import { InfakSedekah, Admin, JurnalKas, Log } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
-import { createBackup, generateKodeInvoice } from '@/lib/utils';
+import { createBackup, generateKodeInvoice, getClientTimeConfig } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
 import { ValidationError, readDateValue, readOptionalText, readPositiveAmount, readRequiredText } from '@/lib/request-validation';
@@ -136,7 +136,7 @@ export async function POST(request) {
     
     t = await sequelize.transaction();
 
-    const kodeTransaksi = generateKodeInvoice('INF');
+    const kodeTransaksi = generateKodeInvoice('INF', getClientTimeConfig(request));
     
     const infak = await InfakSedekah.create({
       kode_transaksi: kodeTransaksi,

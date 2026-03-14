@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/auth';
 import { Pengeluaran, Admin, JurnalKas, Log } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
-import { createBackup, generateKodeInvoice } from '@/lib/utils';
+import { createBackup, generateKodeInvoice, getClientTimeConfig } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 import { claimIdempotency, logDuplicateAttempt, releaseGuard, respondWithGuard } from '@/lib/request-guard';
 import { ValidationError, readDateValue, readEnumValue, readOptionalText, readPositiveAmount, readRequiredText } from '@/lib/request-validation';
@@ -144,7 +144,7 @@ export async function POST(request) {
     
     t = await sequelize.transaction();
 
-    const kodePengeluaran = generateKodeInvoice('OUT');
+    const kodePengeluaran = generateKodeInvoice('OUT', getClientTimeConfig(request));
     
     const pengeluaran = await Pengeluaran.create({
       kode_pengeluaran: kodePengeluaran,

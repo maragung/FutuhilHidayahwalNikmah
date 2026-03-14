@@ -38,13 +38,77 @@ export async function createBackup(aksi, tabel, dataSebelum, dataSesudah, adminI
 
 const kodeMinuteCounter = new Map();
 
-export function generateKodeInvoice(prefix = 'SPP') {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hour = String(now.getHours()).padStart(2, '0');
-  const minute = String(now.getMinutes()).padStart(2, '0');
+function getDatePartsForZone(now, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+
+  const get = (type) => parts.find((p) => p.type === type)?.value || '';
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour: get('hour'),
+    minute: get('minute'),
+  };
+}
+
+function getDatePartsForOffset(now, offsetMinutes) {
+  const localMs = now.getTime() + (offsetMinutes * 60 * 1000);
+  const shifted = new Date(localMs);
+  return {
+    year: String(shifted.getUTCFullYear()),
+    month: String(shifted.getUTCMonth() + 1).padStart(2, '0'),
+    day: String(shifted.getUTCDate()).padStart(2, '0'),
+    hour: String(shifted.getUTCHours()).padStart(2, '0'),
+    minute: String(shifted.getUTCMinutes()).padStart(2, '0'),
+  };
+}
+
+export function getClientTimeConfig(request) {
+  const timeZoneRaw = request?.headers?.get('x-client-timezone') || '';
+  const timeZone = timeZoneRaw.trim();
+
+  const offsetRaw = request?.headers?.get('x-client-tz-offset') || '';
+  const offset = Number.parseInt(offsetRaw, 10);
+  const offsetMinutes = Number.isFinite(offset) ? offset : null;
+
+  return { timeZone, offsetMinutes };
+}
+
+export function generateKodeInvoice(prefix = 'SPP', options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+
+  let parts;
+  if (options.timeZone) {
+    try {
+      parts = getDatePartsForZone(now, options.timeZone);
+    } catch {
+      parts = null;
+    }
+  }
+
+  if (!parts && Number.isFinite(options.offsetMinutes)) {
+    parts = getDatePartsForOffset(now, options.offsetMinutes);
+  }
+
+  if (!parts) {
+    parts = {
+      year: String(now.getFullYear()),
+      month: String(now.getMonth() + 1).padStart(2, '0'),
+      day: String(now.getDate()).padStart(2, '0'),
+      hour: String(now.getHours()).padStart(2, '0'),
+      minute: String(now.getMinutes()).padStart(2, '0'),
+    };
+  }
+
+  const { year, month, day, hour, minute } = parts;
   const timePart = `${year}${month}${day}-${hour}${minute}`;
   const key = `${prefix}-${timePart}`;
 

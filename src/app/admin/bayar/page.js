@@ -265,6 +265,8 @@ function BayarPageInner() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'x-client-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+          'x-client-tz-offset': String(-new Date().getTimezoneOffset()),
           'x-idempotency-key': createIdempotencyKey('spp')
         },
         body:    JSON.stringify({
@@ -417,9 +419,6 @@ function BayarPageInner() {
               {getYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-          <p className="text-xs text-gray-500 mb-2">
-            Pilihan tahun disimpan otomatis dan tetap sama setelah halaman direfresh.
-          </p>
 
           <input
             type="text"
@@ -543,11 +542,6 @@ function BayarPageInner() {
                   <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold">
                     SPP: {formatCurrency(selectedSantri.nominal_spp)}/bln
                   </span>
-                  {bulanMulai && (
-                    <span className="px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700">
-                      Wajib bayar mulai: <strong>{namaBulan[bulanMulai - 1]} {tahun}</strong>
-                    </span>
-                  )}
                   {earliestUnpaid ? (
                     <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-600">
                       Tunggakan dari: <strong>{namaBulan[earliestUnpaid - 1]} {tahun}</strong>

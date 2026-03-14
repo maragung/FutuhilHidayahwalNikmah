@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-const createInitialForm = (ustName = '') => ({
+const createInitialForm = () => ({
   santri_id: '',
   tanggal: new Date().toISOString().split('T')[0],
   jilid: '',
   judul_prestasi: '',
   halaman: '',
-  paraf: ustName,
+  paraf: '',
   keterangan: '',
 });
 
@@ -82,7 +82,7 @@ export default function PrestasiSantriPage() {
     try {
       const adminData = JSON.parse(localStorage.getItem('admin_data') || 'null');
       setCurrentUser(adminData);
-      setForm(createInitialForm(adminData?.nama_lengkap || ''));
+      setForm(createInitialForm());
     } catch {
       setCurrentUser(null);
       setForm(createInitialForm());
@@ -124,7 +124,7 @@ export default function PrestasiSantriPage() {
 
   const resetForm = () => {
     setEditingId(null);
-    setForm(createInitialForm(currentUser?.nama_lengkap || ''));
+    setForm(createInitialForm());
   };
 
   const updateForm = (key, value) => {

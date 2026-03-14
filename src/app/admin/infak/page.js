@@ -96,6 +96,8 @@ export default function InfakPage() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'x-client-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+          'x-client-tz-offset': String(-new Date().getTimezoneOffset()),
           'x-idempotency-key': createIdempotencyKey('infak')
         },
         body: JSON.stringify({
