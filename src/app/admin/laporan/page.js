@@ -12,6 +12,7 @@ export default function LaporanPage() {
     tipe: 'santri',
     tahun: new Date().getFullYear(),
     bulan: '',
+    sort_santri: 'no_absen',
     format: 'pdf',
     kegiatan_id: '',
     filter_kategori: '',   // subsidi | non_subsidi | jilid | lunas
@@ -71,27 +72,23 @@ export default function LaporanPage() {
     switch (tipe) {
       case 'santri':
         return [
-          ...(f.include_nik ? [{ key: 'nik', label: 'NIK' }] : []),
-          { key: 'nama_lengkap', label: 'Nama Lengkap' },
-          { key: 'kategori_subsidi', label: 'Kategori' },
+          { key: 'no_absen', label: 'No' },
+          { key: 'nama_santri', label: 'Nama Santri' },
           { key: 'jilid', label: 'Jilid' },
-          { key: 'setor_jan', label: 'Setor Jan', format: 'currency' },
-          { key: 'setor_feb', label: 'Setor Feb', format: 'currency' },
-          { key: 'setor_mar', label: 'Setor Mar', format: 'currency' },
-          { key: 'setor_apr', label: 'Setor Apr', format: 'currency' },
-          { key: 'setor_mei', label: 'Setor Mei', format: 'currency' },
-          { key: 'setor_jun', label: 'Setor Jun', format: 'currency' },
-          { key: 'setor_jul', label: 'Setor Jul', format: 'currency' },
-          { key: 'setor_agu', label: 'Setor Agu', format: 'currency' },
-          { key: 'setor_sep', label: 'Setor Sep', format: 'currency' },
-          { key: 'setor_okt', label: 'Setor Okt', format: 'currency' },
-          { key: 'setor_nov', label: 'Setor Nov', format: 'currency' },
-          { key: 'setor_des', label: 'Setor Des', format: 'currency' },
-          { key: 'tgl_lahir', label: 'Tgl Lahir', format: 'date' },
-          { key: 'nama_wali', label: 'Nama Wali' },
-          ...(f.include_phone ? [{ key: 'no_telp_wali', label: 'No Telp Wali' }] : []),
-          ...(f.include_email ? [{ key: 'email_wali', label: 'Email Wali' }] : []),
-          { key: 'alamat', label: 'Alamat' },
+          { key: 'bulan_1', label: 'Jan', format: 'currency' },
+          { key: 'bulan_2', label: 'Feb', format: 'currency' },
+          { key: 'bulan_3', label: 'Mar', format: 'currency' },
+          { key: 'bulan_4', label: 'Apr', format: 'currency' },
+          { key: 'bulan_5', label: 'Mei', format: 'currency' },
+          { key: 'bulan_6', label: 'Jun', format: 'currency' },
+          { key: 'bulan_7', label: 'Jul', format: 'currency' },
+          { key: 'bulan_8', label: 'Agu', format: 'currency' },
+          { key: 'bulan_9', label: 'Sep', format: 'currency' },
+          { key: 'bulan_10', label: 'Okt', format: 'currency' },
+          { key: 'bulan_11', label: 'Nov', format: 'currency' },
+          { key: 'bulan_12', label: 'Des', format: 'currency' },
+          { key: 'terlunasi', label: 'Terlunasi' },
+          { key: 'total', label: 'Total' },
         ];
       case 'pembayaran':
         return [
@@ -314,6 +311,9 @@ export default function LaporanPage() {
         url += `&filter_kategori=${filter.filter_kategori}`;
         if (filter.filter_kategori === 'jilid' && filter.filter_jilid) url += `&filter_jilid=${encodeURIComponent(filter.filter_jilid)}`;
       }
+      if (tipeAktif === 'santri') {
+        url += `&sort_santri=${filter.sort_santri || 'no_absen'}`;
+      }
       if (tipeAktif !== 'prestasi_santri') {
         url += `&include_nik=${filter.include_nik}`;
         url += `&include_email=${filter.include_email}`;
@@ -489,6 +489,20 @@ export default function LaporanPage() {
                     className="input-field mt-2"
                   />
                 )}
+              </div>
+            )}
+
+            {filter.tipe === 'santri' && !isPengajar && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Urutan Data Santri</label>
+                <select
+                  value={filter.sort_santri}
+                  onChange={(e) => setFilter({ ...filter, sort_santri: e.target.value })}
+                  className="input-field"
+                >
+                  <option value="no_absen">No. Absen</option>
+                  <option value="nama">Nama</option>
+                </select>
               </div>
             )}
 

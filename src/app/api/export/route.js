@@ -28,6 +28,7 @@ export async function GET(request) {
     const includePhone = searchParams.get('include_phone') !== 'false';
     const filterKategori = searchParams.get('filter_kategori') || ''; // subsidi|non_subsidi|jilid|lunas
     const filterJilid = searchParams.get('filter_jilid') || '';
+    const sortSantri = searchParams.get('sort_santri') === 'nama' ? 'nama' : 'no_absen';
     
     let data = [];
     let title = '';
@@ -48,7 +49,6 @@ export async function GET(request) {
 
         let santriRows = await Santri.findAll({
           where: santriWhere,
-          order: [['nama_lengkap', 'ASC']],
           raw: true,
         });
 
@@ -81,10 +81,36 @@ export async function GET(request) {
           });
         }
 
+        const santriComparator = (a, b) => {
+          if (sortSantri === 'nama') {
+            const namaCompare = String(a.nama_lengkap || '').localeCompare(String(b.nama_lengkap || ''), 'id', {
+              sensitivity: 'base',
+              numeric: true,
+            });
+            if (namaCompare !== 0) return namaCompare;
+          }
+
+          const noA = a.no_absen == null ? Number.MAX_SAFE_INTEGER : Number(a.no_absen);
+          const noB = b.no_absen == null ? Number.MAX_SAFE_INTEGER : Number(b.no_absen);
+          if (noA !== noB) return noA - noB;
+
+          return String(a.nama_lengkap || '').localeCompare(String(b.nama_lengkap || ''), 'id', {
+            sensitivity: 'base',
+            numeric: true,
+          });
+        };
+
+        santriRows = [...santriRows].sort(santriComparator);
+
         const pembayaranNominalRows = await PembayaranSPP.findAll({
           where: { tahun_spp: tahun },
           attributes: ['santri_id', 'bulan_spp', [sequelize.fn('SUM', sequelize.col('nominal')), 'total_nominal']],
           group: ['santri_id', 'bulan_spp'],
+          raw: true,
+        });
+
+        const pembayaranSemuaRows = await PembayaranSPP.findAll({
+          attributes: ['santri_id', 'tahun_spp', 'bulan_spp'],
           raw: true,
         });
 
@@ -97,25 +123,112 @@ export async function GET(request) {
           nominalMap[sid][bulanKe] = nominalTotal;
         });
 
-        data = santriRows.map((s) => ({
-          ...s,
-          kategori_subsidi: s.is_subsidi ? 'Subsidi' : 'Non Subsidi',
-          nik: includeNik ? s.nik : '',
-          email_wali: includeEmail ? s.email_wali : '',
-          no_telp_wali: includePhone ? s.no_telp_wali : '',
-          setor_jan: nominalMap[s.id]?.[1] || 0,
-          setor_feb: nominalMap[s.id]?.[2] || 0,
-          setor_mar: nominalMap[s.id]?.[3] || 0,
-          setor_apr: nominalMap[s.id]?.[4] || 0,
-          setor_mei: nominalMap[s.id]?.[5] || 0,
-          setor_jun: nominalMap[s.id]?.[6] || 0,
-          setor_jul: nominalMap[s.id]?.[7] || 0,
-          setor_agu: nominalMap[s.id]?.[8] || 0,
-          setor_sep: nominalMap[s.id]?.[9] || 0,
-          setor_okt: nominalMap[s.id]?.[10] || 0,
-          setor_nov: nominalMap[s.id]?.[11] || 0,
-          setor_des: nominalMap[s.id]?.[12] || 0,
-        }));
+        const pembayaranSemuaMap = {};
+        pembayaranSemuaRows.forEach((row) => {
+          const sid = Number.parseInt(row.santri_id, 10);
+          const tahunSpp = Number.parseInt(row.tahun_spp, 10);
+          const bulanSpp = Number.parseInt(row.bulan_spp, 10);
+          const key = `${tahunSpp}-${bulanSpp}`;
+          if (!pembayaranSemuaMap[sid]) pembayaranSemuaMap[sid] = new Set();
+          pembayaranSemuaMap[sid].add(key);
+        });
+
+        const now = new Date();
+        const batasAkhirTahunDipilih = tahun === now.getFullYear() ? now.getMonth() + 1 : 12;
+
+        const hitungBulanWajibDanTerbayar = (santri) => {
+          const tglDaftar = new Date(santri.tgl_mendaftar);
+          const tahunDaftar = tglDaftar.getFullYear();
+          const bulanDaftar = tglDaftar.getMonth() + 1;
+
+          let bulanMulai = 1;
+          if (tahun < tahunDaftar) {
+            bulanMulai = 13;
+          } else if (tahun === tahunDaftar) {
+            bulanMulai = bulanDaftar;
+          }
+
+          let bulanAkhir = 12;
+          if (santri.tgl_nonaktif) {
+            const tglNonaktif = new Date(santri.tgl_nonaktif);
+            if (tglNonaktif.getFullYear() < tahun) {
+              bulanAkhir = 0;
+            } else if (tglNonaktif.getFullYear() === tahun) {
+              bulanAkhir = Math.min(bulanAkhir, tglNonaktif.getMonth());
+            }
+          }
+
+          bulanAkhir = Math.min(bulanAkhir, batasAkhirTahunDipilih);
+          if (bulanMulai > bulanAkhir) {
+            return { bulan_wajib: 0, bulan_terbayar: 0 };
+          }
+
+          const payMap = nominalMap[santri.id] || {};
+          let wajib = 0;
+          let terbayar = 0;
+          for (let b = bulanMulai; b <= bulanAkhir; b++) {
+            wajib += 1;
+            if (payMap[b]) terbayar += 1;
+          }
+          return { bulan_wajib: wajib, bulan_terbayar: terbayar };
+        };
+
+        const hitungTerlunasiLifetime = (santri) => {
+          const tglDaftar = new Date(santri.tgl_mendaftar);
+          const startYear = tglDaftar.getFullYear();
+          const startMonth = tglDaftar.getMonth() + 1;
+
+          let endYear = now.getFullYear();
+          let endMonth = now.getMonth() + 1;
+          if (santri.tgl_nonaktif) {
+            const tglNonaktif = new Date(santri.tgl_nonaktif);
+            const nonaktifYear = tglNonaktif.getFullYear();
+            const nonaktifMonth = tglNonaktif.getMonth();
+            if (nonaktifYear < endYear || (nonaktifYear === endYear && nonaktifMonth < endMonth)) {
+              endYear = nonaktifYear;
+              endMonth = nonaktifMonth;
+            }
+          }
+
+          const totalWajib = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+          const bulanSejakDaftarSampaiKini = Math.max(0, totalWajib);
+
+          const setBayar = pembayaranSemuaMap[santri.id] || new Set();
+          let bulanDibayarTotal = 0;
+          for (let y = startYear; y <= endYear; y++) {
+            const monthStart = y === startYear ? startMonth : 1;
+            const monthEnd = y === endYear ? endMonth : 12;
+            for (let m = monthStart; m <= monthEnd; m++) {
+              if (setBayar.has(`${y}-${m}`)) bulanDibayarTotal += 1;
+            }
+          }
+
+          return { bulan_dibayar_total: bulanDibayarTotal, bulan_sejak_daftar_sampai_kini: bulanSejakDaftarSampaiKini };
+        };
+
+        data = santriRows.map((s) => {
+          const perTahun = hitungBulanWajibDanTerbayar(s);
+          const lifetime = hitungTerlunasiLifetime(s);
+          return {
+            no_absen: s.no_absen ?? '-',
+            nama_santri: s.nama_lengkap,
+            jilid: s.jilid,
+            bulan_1: nominalMap[s.id]?.[1] || 0,
+            bulan_2: nominalMap[s.id]?.[2] || 0,
+            bulan_3: nominalMap[s.id]?.[3] || 0,
+            bulan_4: nominalMap[s.id]?.[4] || 0,
+            bulan_5: nominalMap[s.id]?.[5] || 0,
+            bulan_6: nominalMap[s.id]?.[6] || 0,
+            bulan_7: nominalMap[s.id]?.[7] || 0,
+            bulan_8: nominalMap[s.id]?.[8] || 0,
+            bulan_9: nominalMap[s.id]?.[9] || 0,
+            bulan_10: nominalMap[s.id]?.[10] || 0,
+            bulan_11: nominalMap[s.id]?.[11] || 0,
+            bulan_12: nominalMap[s.id]?.[12] || 0,
+            terlunasi: `${lifetime.bulan_dibayar_total}/${lifetime.bulan_sejak_daftar_sampai_kini}`,
+            total: `${perTahun.bulan_terbayar}/${perTahun.bulan_wajib}`,
+          };
+        });
         break;
       }
         
