@@ -16,6 +16,13 @@ export async function GET(request) {
         { status: 401 }
       );
     }
+
+    if (auth.user?.jabatan !== 'Developer') {
+      return NextResponse.json(
+        { success: false, pesan: 'Akses jurnal kas dibatasi untuk Developer' },
+        { status: 403 }
+      );
+    }
     
     const { searchParams } = new URL(request.url);
     const tahun = searchParams.get('tahun');

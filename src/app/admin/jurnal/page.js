@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 
 export default function JurnalPage() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [checkingAccess, setCheckingAccess] = useState(true);
   const [loading, setLoading] = useState(false);
   const [jurnalList, setJurnalList] = useState([]);
   const [error, setError] = useState('');
@@ -38,10 +40,25 @@ export default function JurnalPage() {
   const isKoreksiSPP = (jurnal) => jurnal?.is_koreksi_spp === true;
 
   useEffect(() => {
-    fetchJurnal();
-  }, [pagination.halaman, filter]);
+    try {
+      const userData = localStorage.getItem('admin_data');
+      if (userData) {
+        setCurrentUser(JSON.parse(userData));
+      }
+    } catch {
+      setCurrentUser(null);
+    } finally {
+      setCheckingAccess(false);
+    }
+  }, []);
 
   useEffect(() => {
+    if (checkingAccess || currentUser?.jabatan !== 'Developer') return;
+    fetchJurnal();
+  }, [pagination.halaman, filter, checkingAccess, currentUser?.jabatan]);
+
+  useEffect(() => {
+    if (checkingAccess || currentUser?.jabatan !== 'Developer') return;
     const fetchSettings = async () => {
       const token = localStorage.getItem('auth_token');
       try {
@@ -59,7 +76,7 @@ export default function JurnalPage() {
       } catch {}
     };
     fetchSettings();
-  }, []);
+  }, [checkingAccess, currentUser?.jabatan]);
 
   const getYearOptions = () => {
     const currentYear = new Date().getFullYear();
@@ -91,6 +108,29 @@ export default function JurnalPage() {
       setLoading(false);
     }
   };
+
+  if (checkingAccess) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <svg className="animate-spin h-10 w-10 text-green-600" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (!currentUser || currentUser.jabatan !== 'Developer') {
+    return (
+      <div className="text-center py-12">
+        <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        <h2 className="text-xl font-semibold text-gray-700">Akses Terbatas</h2>
+        <p className="text-gray-500 mt-2">Halaman Jurnal Kas hanya dapat diakses oleh Developer</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -179,9 +219,9 @@ export default function JurnalPage() {
               <table className="w-full">
                 <thead>
                   <tr className="table-header">
-                    <th className="px-4 py-3 text-left">Tanggal</th>
+                    <th className="px-4 py-3 text-left">Tanggal Aksi</th>
                     <th className="px-4 py-3 text-center">Jenis</th>
-                    <th className="px-4 py-3 text-left">Kode Referensi</th>
+                    <th className="px-4 py-3 text-left">Sumber Transaksi</th>
                     <th className="px-4 py-3 text-left">Keterangan</th>
                     <th className="px-4 py-3 text-right">Masuk</th>
                     <th className="px-4 py-3 text-right">Keluar</th>
