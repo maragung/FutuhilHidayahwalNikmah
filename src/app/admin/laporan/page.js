@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { safeHexColor } from '@/lib/color';
 
 export default function LaporanPage() {
+  const TAHUN_STORAGE_KEY = 'laporan_selected_tahun';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -50,6 +51,21 @@ export default function LaporanPage() {
 
   const formatCurrency = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v || 0);
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+
+  useEffect(() => {
+    try {
+      const savedYear = parseInt(localStorage.getItem(TAHUN_STORAGE_KEY) || '', 10);
+      if (Number.isInteger(savedYear) && savedYear >= 2000 && savedYear <= 2100) {
+        setFilter((prev) => ({ ...prev, tahun: savedYear }));
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TAHUN_STORAGE_KEY, String(filter.tahun));
+    } catch {}
+  }, [filter.tahun]);
 
   const getHeaders = (tipe, f = filter) => {
     switch (tipe) {
@@ -184,9 +200,7 @@ export default function LaporanPage() {
           setTahunMulai(startYear);
           setWarnaNonSubsidi(safeHexColor(data.data.warna_non_subsidi, '#04B816'));
           setWarnaSubsidi(safeHexColor(data.data.warna_subsidi, '#045EB8'));
-          if (filter.tahun < startYear) {
-            setFilter((prev) => ({ ...prev, tahun: startYear }));
-          }
+          setFilter((prev) => (prev.tahun < startYear ? { ...prev, tahun: startYear } : prev));
         }
       } catch {}
     };

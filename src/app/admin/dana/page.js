@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 
 export default function DanaPage() {
+  const TAHUN_STORAGE_KEY = 'dana_selected_tahun';
   const [loading, setLoading] = useState(true);
   const [dana, setDana] = useState(null);
   const [error, setError] = useState('');
@@ -21,6 +22,21 @@ export default function DanaPage() {
                     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
   useEffect(() => {
+    try {
+      const savedYear = parseInt(localStorage.getItem(TAHUN_STORAGE_KEY) || '', 10);
+      if (Number.isInteger(savedYear) && savedYear >= 2000 && savedYear <= 2100) {
+        setTahun(savedYear);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TAHUN_STORAGE_KEY, String(tahun));
+    } catch {}
+  }, [tahun]);
+
+  useEffect(() => {
     const fetchSettings = async () => {
       const token = localStorage.getItem('auth_token');
       try {
@@ -31,7 +47,7 @@ export default function DanaPage() {
         if (data.success) {
           const startYear = parseInt(data.data.tahun_mulai_pembukuan || new Date().getFullYear());
           setTahunMulai(startYear);
-          if (tahun < startYear) setTahun(startYear);
+          setTahun((prev) => (prev < startYear ? startYear : prev));
         }
       } catch {}
     };

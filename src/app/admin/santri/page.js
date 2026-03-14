@@ -12,6 +12,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function DaftarSantriPage() {
+  const TAHUN_STORAGE_KEY = 'santri_selected_tahun';
   const [loading, setLoading] = useState(true);
   const [statusPembayaran, setStatusPembayaran] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -42,6 +43,21 @@ export default function DaftarSantriPage() {
   const isPengajar = currentUser?.jabatan === 'Pengajar';
   const canManageSantriStatus = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'].includes(currentUser?.jabatan);
   const canDeleteSantri = ['Developer', 'Pimpinan TPQ', 'Sekretaris', 'Bendahara'].includes(currentUser?.jabatan);
+
+  useEffect(() => {
+    try {
+      const savedYear = parseInt(localStorage.getItem(TAHUN_STORAGE_KEY) || '', 10);
+      if (Number.isInteger(savedYear) && savedYear >= 2000 && savedYear <= 2100) {
+        setTahun(savedYear);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TAHUN_STORAGE_KEY, String(tahun));
+    } catch {}
+  }, [tahun]);
 
   const fetchData = async () => {
     const token = localStorage.getItem('auth_token');
@@ -88,7 +104,7 @@ export default function DaftarSantriPage() {
         if (data.success) {
           setSettings((prev) => ({ ...prev, ...data.data }));
           const startYear = parseInt(data.data.tahun_mulai_pembukuan || new Date().getFullYear());
-          if (tahun < startYear) setTahun(startYear);
+          setTahun((prev) => (prev < startYear ? startYear : prev));
         }
       } catch {}
     };

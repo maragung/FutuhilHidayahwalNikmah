@@ -13,6 +13,7 @@ const createInitialForm = (ustName = '') => ({
 });
 
 export default function PrestasiSantriPage() {
+  const TAHUN_STORAGE_KEY = 'prestasi_santri_selected_tahun';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -25,6 +26,21 @@ export default function PrestasiSantriPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [form, setForm] = useState(createInitialForm());
+
+  useEffect(() => {
+    try {
+      const savedYear = parseInt(localStorage.getItem(TAHUN_STORAGE_KEY) || '', 10);
+      if (Number.isInteger(savedYear) && savedYear >= 2000 && savedYear <= 2100) {
+        setTahun(savedYear);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TAHUN_STORAGE_KEY, String(tahun));
+    } catch {}
+  }, [tahun]);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
 
