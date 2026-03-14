@@ -416,7 +416,7 @@ export default function DaftarSantriPage() {
                     <th key={i} className="px-2 py-3 text-center">{b}</th>
                   ))}
                   <th className="px-3 py-3 text-center">Terlunasi</th>
-                  <th className="px-3 py-3 text-center">Total</th>
+                  <th className="px-3 py-3 text-center">Tahun Ini</th>
                 </tr>
               </thead>
               <tbody>
