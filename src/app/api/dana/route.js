@@ -22,6 +22,12 @@ export async function GET(request) {
     
     const startDate = new Date(tahun, 0, 1);
     const endDate = new Date(tahun, 11, 31, 23, 59, 59);
+
+    // Jurnal pembatalan SPP sudah tercermin dari berkurangnya data PembayaranSPP.
+    // Jika tetap dihitung sebagai pengeluaran jurnal, nilai ringkasan menjadi dobel.
+    const excludeSppCancellation = {
+      [Op.notLike]: 'Pembatalan pembayaran SPP%'
+    };
     
     // Total SPP tahun ini
     const totalSPP = await PembayaranSPP.sum('nominal', {
@@ -55,6 +61,7 @@ export async function GET(request) {
       where: {
         jenis: 'Keluar',
         tgl_transaksi: { [Op.between]: [startDate, endDate] },
+        keterangan: excludeSppCancellation,
       },
     }) || 0;
     
@@ -107,6 +114,7 @@ export async function GET(request) {
         where: {
           jenis: 'Keluar',
           tgl_transaksi: { [Op.between]: [bulanStart, bulanEnd] },
+          keterangan: excludeSppCancellation,
         },
       }) || 0;
       

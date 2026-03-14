@@ -548,12 +548,12 @@ function BayarPageInner() {
                   </span>
                   {bulanMulai && (
                     <span className="px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700">
-                      Wajib bayar mulai: <strong>{namaBulan[bulanMulai - 1]}</strong>
+                      Wajib bayar mulai: <strong>{namaBulan[bulanMulai - 1]} {tahun}</strong>
                     </span>
                   )}
                   {earliestUnpaid ? (
                     <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-600">
-                      Tunggakan dari: <strong>{namaBulan[earliestUnpaid - 1]}</strong>
+                      Tunggakan dari: <strong>{namaBulan[earliestUnpaid - 1]} {tahun}</strong>
                     </span>
                   ) : selectedSantri.bulan_wajib > 0 ? (
                     <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
