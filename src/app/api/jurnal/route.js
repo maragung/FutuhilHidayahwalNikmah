@@ -50,10 +50,25 @@ export async function GET(request) {
       limit,
       offset,
     });
+
+    const normalizedRows = rows.map((row) => {
+      const data = row.toJSON();
+      const keterangan = String(data.keterangan || '');
+      const referensi = String(data.referensi_kode || '');
+      const isKoreksiSPP =
+        data.jenis === 'Keluar' &&
+        (keterangan.startsWith('Pembatalan pembayaran SPP') ||
+          (referensi.startsWith('REV-') && keterangan.includes('pembayaran SPP')));
+
+      return {
+        ...data,
+        is_koreksi_spp: isKoreksiSPP,
+      };
+    });
     
     return NextResponse.json({
       success: true,
-      data: rows,
+      data: normalizedRows,
       pagination: {
         total: count,
         halaman: page,

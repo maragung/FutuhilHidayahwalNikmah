@@ -35,6 +35,8 @@ export default function JurnalPage() {
   const namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
                     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
+  const isKoreksiSPP = (jurnal) => jurnal?.is_koreksi_spp === true;
+
   useEffect(() => {
     fetchJurnal();
   }, [pagination.halaman, filter]);
@@ -161,6 +163,9 @@ export default function JurnalPage() {
       {/* Tabel Jurnal */}
       <div className="card">
         <h3 className="font-semibold text-gray-800 mb-4">Transaksi Jurnal Kas</h3>
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+          Transaksi <strong>Koreksi SPP</strong> adalah pembatalan pembayaran SPP, bukan pengeluaran operasional.
+        </div>
         
         {loading ? (
           <div className="flex justify-center py-8">
@@ -199,7 +204,11 @@ export default function JurnalPage() {
                           {formatDateTime(jurnal.tgl_transaksi)}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {jurnal.jenis === 'Masuk' ? (
+                          {isKoreksiSPP(jurnal) ? (
+                            <span className="px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">
+                              Koreksi SPP
+                            </span>
+                          ) : jurnal.jenis === 'Masuk' ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-700">
                               Masuk
                             </span>
@@ -213,12 +222,19 @@ export default function JurnalPage() {
                           {jurnal.referensi_kode}
                         </td>
                         <td className="px-4 py-3 text-sm max-w-xs truncate">
-                          {jurnal.keterangan}
+                          <div className="flex items-center gap-2">
+                            <span>{jurnal.keterangan}</span>
+                            {isKoreksiSPP(jurnal) && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800">
+                                Non-operasional
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-green-600">
                           {jurnal.jenis === 'Masuk' ? formatCurrency(jurnal.nominal) : '-'}
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-red-600">
+                        <td className={`px-4 py-3 text-right font-semibold ${isKoreksiSPP(jurnal) ? 'text-amber-700' : 'text-red-600'}`}>
                           {jurnal.jenis === 'Keluar' ? formatCurrency(jurnal.nominal) : '-'}
                         </td>
                         <td className={`px-4 py-3 text-right font-bold ${jurnal.saldo_berjalan >= 0 ? 'text-gray-800' : 'text-red-600'}`}>
