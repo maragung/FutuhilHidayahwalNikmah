@@ -87,8 +87,9 @@ export default function LaporanPage() {
           { key: 'bulan_10', label: 'Okt', format: 'currency' },
           { key: 'bulan_11', label: 'Nov', format: 'currency' },
           { key: 'bulan_12', label: 'Des', format: 'currency' },
+          { key: 'total_nominal', label: 'Total', format: 'currency' },
           { key: 'terlunasi', label: 'Terlunasi' },
-          { key: 'total', label: 'Total' },
+          { key: 'total', label: 'Tahun Ini' },
         ];
       case 'pembayaran':
         return [

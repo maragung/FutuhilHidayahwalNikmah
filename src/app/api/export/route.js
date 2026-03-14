@@ -209,10 +209,7 @@ export async function GET(request) {
         data = santriRows.map((s) => {
           const perTahun = hitungBulanWajibDanTerbayar(s);
           const lifetime = hitungTerlunasiLifetime(s);
-          return {
-            no_absen: s.no_absen ?? '-',
-            nama_santri: s.nama_lengkap,
-            jilid: s.jilid,
+          const bulanNominal = {
             bulan_1: nominalMap[s.id]?.[1] || 0,
             bulan_2: nominalMap[s.id]?.[2] || 0,
             bulan_3: nominalMap[s.id]?.[3] || 0,
@@ -225,6 +222,15 @@ export async function GET(request) {
             bulan_10: nominalMap[s.id]?.[10] || 0,
             bulan_11: nominalMap[s.id]?.[11] || 0,
             bulan_12: nominalMap[s.id]?.[12] || 0,
+          };
+          const totalNominal = Object.values(bulanNominal).reduce((sum, n) => sum + Number(n || 0), 0);
+
+          return {
+            no_absen: s.no_absen ?? '-',
+            nama_santri: s.nama_lengkap,
+            jilid: s.jilid,
+            ...bulanNominal,
+            total_nominal: totalNominal,
             terlunasi: `${lifetime.bulan_dibayar_total}/${lifetime.bulan_sejak_daftar_sampai_kini}`,
             total: `${perTahun.bulan_terbayar}/${perTahun.bulan_wajib}`,
           };
