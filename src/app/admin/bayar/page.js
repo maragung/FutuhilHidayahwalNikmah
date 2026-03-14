@@ -29,6 +29,7 @@ function BayarPageInner() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [feedbackModal, setFeedbackModal] = useState({ show: false, type: 'success', message: '' });
   const [paidPayments, setPaidPayments] = useState({});
   const [pin, setPin] = useState('');
   const [cancelModal, setCancelModal] = useState({ show: false, payment: null, bulan: null, cancelPin: '' });
@@ -53,6 +54,16 @@ function BayarPageInner() {
   const formatCurrency = (amount) => new Intl.NumberFormat('id-ID', {
     style: 'currency', currency: 'IDR', minimumFractionDigits: 0,
   }).format(amount || 0);
+
+  useEffect(() => {
+    if (!error) return;
+    setFeedbackModal({ show: true, type: 'error', message: error });
+  }, [error]);
+
+  useEffect(() => {
+    if (!success) return;
+    setFeedbackModal({ show: true, type: 'success', message: success });
+  }, [success]);
 
   const getYearOptions = () => {
     const currentYear = new Date().getFullYear();
@@ -399,21 +410,6 @@ function BayarPageInner() {
         <p className="text-gray-500">Catat pembayaran SPP santri</p>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-start gap-2">
-          <span className="shrink-0">⚠️</span>
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError('')} className="text-red-500 ml-2">✕</button>
-        </div>
-      )}
-      {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 flex items-start gap-2">
-          <span className="shrink-0">✅</span>
-          <span className="flex-1">{success}</span>
-          <button onClick={() => setSuccess('')} className="text-green-500 ml-2">✕</button>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* ── Panel kiri: Pilih Santri ──────────────────────────────────── */}
@@ -506,7 +502,8 @@ function BayarPageInner() {
                       setSelectedSantri(santri);
                       setSelectedBulan([]);
                       setPaidPayments({});
-                      if (!abaikanAturanNominal) setNominal(santri.nominal_spp || 0);
+                      setAbaikanAturanNominal(false);
+                      setNominal(santri.nominal_spp || 0);
                       fetchPaidPayments(santri.id, tahun);
                     }}
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
@@ -910,6 +907,43 @@ function BayarPageInner() {
                 {cancelLoading ? 'Membatalkan...' : 'Ya, Batalkan'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Feedback Sukses / Gagal ─────────────────────────────────── */}
+      {feedbackModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${feedbackModal.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                {feedbackModal.type === 'success' ? (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M5.07 19h13.86c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.73 3z" />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <h4 className="text-lg font-semibold text-gray-800">
+                  {feedbackModal.type === 'success' ? 'Berhasil' : 'Terjadi Kesalahan'}
+                </h4>
+                <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{feedbackModal.message}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setFeedbackModal({ show: false, type: 'success', message: '' });
+                setError('');
+                setSuccess('');
+              }}
+              className={`w-full py-2.5 rounded-lg font-semibold ${feedbackModal.type === 'success' ? 'btn-primary' : 'btn-danger'}`}
+            >
+              Tutup
+            </button>
           </div>
         </div>
       )}
