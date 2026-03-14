@@ -46,6 +46,11 @@ const JurnalKas = sequelize.define('JurnalKas', {
   },
 }, {
   tableName: 'jurnal_kas',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
 });
 
 module.exports = JurnalKas;

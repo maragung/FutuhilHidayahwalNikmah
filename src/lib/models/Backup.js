@@ -38,6 +38,11 @@ const Backup = sequelize.define('Backup', {
   },
 }, {
   tableName: 'backup_log',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
 });
 
 module.exports = Backup;

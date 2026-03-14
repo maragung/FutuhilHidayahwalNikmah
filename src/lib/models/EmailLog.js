@@ -52,6 +52,11 @@ const EmailLog = sequelize.define('EmailLog', {
   },
 }, {
   tableName: 'email_logs',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
   indexes: [
     { fields: ['status'] },
     { fields: ['created_at'] },

@@ -27,6 +27,11 @@ const Log = sequelize.define('Log', {
   },
 }, {
   tableName: 'logs',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
 });
 
 module.exports = Log;

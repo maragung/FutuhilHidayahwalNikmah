@@ -22,6 +22,11 @@ const Pengaturan = sequelize.define('Pengaturan', {
   },
 }, {
   tableName: 'pengaturan',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
 });
 
 // Helper statis untuk mendapatkan nilai pengaturan

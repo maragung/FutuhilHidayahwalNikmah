@@ -33,6 +33,11 @@ const Absensi = sequelize.define('Absensi', {
   },
 }, {
   tableName: 'absensi',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
   indexes: [
     {
       unique: true,

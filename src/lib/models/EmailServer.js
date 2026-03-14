@@ -61,6 +61,11 @@ const EmailServer = sequelize.define('EmailServer', {
   },
 }, {
   tableName: 'email_servers',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
   indexes: [
     { fields: ['tipe', 'urutan'] },
     { fields: ['is_active'] },

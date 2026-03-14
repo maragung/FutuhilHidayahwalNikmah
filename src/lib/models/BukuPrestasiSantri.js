@@ -55,6 +55,11 @@ const BukuPrestasiSantri = sequelize.define('BukuPrestasiSantri', {
   },
 }, {
   tableName: 'buku_prestasi_santri',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
   indexes: [
     { fields: ['santri_id'] },
     { fields: ['admin_id'] },

@@ -39,6 +39,11 @@ const InfakSedekah = sequelize.define('InfakSedekah', {
   },
 }, {
   tableName: 'infak_sedekah',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
 });
 
 module.exports = InfakSedekah;

@@ -53,6 +53,11 @@ const IdempotencyKey = sequelize.define('IdempotencyKey', {
   },
 }, {
   tableName: 'idempotency_keys',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
   indexes: [
     {
       name: 'idx_idempotency_route_scope',

@@ -56,6 +56,11 @@ const PembayaranLain = sequelize.define('PembayaranLain', {
   },
 }, {
   tableName: 'pembayaran_lain',
+  timestamps: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
 });
 
 module.exports = PembayaranLain;
