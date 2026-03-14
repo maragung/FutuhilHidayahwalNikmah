@@ -13,6 +13,7 @@ import { createIdempotencyKey } from '@/lib/client-idempotency';
 function BayarPageInner() {
   const searchParams = useSearchParams();
   const santriIdParam = searchParams.get('santri');
+  const TAHUN_STORAGE_KEY = 'bayar_spp_selected_tahun';
 
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusList, setStatusList] = useState([]);
@@ -59,6 +60,22 @@ function BayarPageInner() {
     return years;
   };
 
+  useEffect(() => {
+    try {
+      const savedYear = parseInt(localStorage.getItem(TAHUN_STORAGE_KEY) || '', 10);
+      if (Number.isInteger(savedYear) && savedYear >= 2000 && savedYear <= 2100) {
+        setTahun(savedYear);
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TAHUN_STORAGE_KEY, String(tahun));
+    } catch {}
+  }, [tahun]);
+
   // ── Fetch pengaturan & role ────────────────────────────────────────────────
   useEffect(() => {
     const fetchSettings = async () => {
@@ -69,7 +86,11 @@ function BayarPageInner() {
         if (data.success) {
           setSettings(prev => ({ ...prev, ...data.data }));
           const startYear = parseInt(data.data.tahun_mulai_pembukuan || new Date().getFullYear());
-          if (tahun < startYear) setTahun(startYear);
+          const savedYear = parseInt(localStorage.getItem(TAHUN_STORAGE_KEY) || '', 10);
+          const hasSavedYear = Number.isInteger(savedYear);
+          if (!hasSavedYear) {
+            setTahun((prev) => (prev < startYear ? startYear : prev));
+          }
         }
       } catch {}
     };
@@ -390,11 +411,18 @@ function BayarPageInner() {
             <select
               value={tahun}
               onChange={(e) => { setTahun(parseInt(e.target.value)); setSelectedBulan([]); setPaidPayments({}); }}
-              className="input-field w-auto text-sm py-1"
+              disabled={!!selectedSantri}
+              title={selectedSantri ? 'Tahun dikunci saat santri sudah dipilih' : 'Pilih tahun pembayaran'}
+              className={`input-field w-auto text-sm py-1 ${selectedSantri ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
             >
               {getYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
+          {selectedSantri && (
+            <p className="text-xs text-amber-600 mb-2">
+              Tahun dikunci selama santri terpilih untuk mencegah salah input.
+            </p>
+          )}
 
           <input
             type="text"
