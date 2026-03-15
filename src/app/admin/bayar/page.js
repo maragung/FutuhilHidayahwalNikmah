@@ -411,6 +411,7 @@ function BayarPageInner() {
         const statusText = editModal.editLunas ? 'dilunasi' : 'dibayar (belum lunas)';
         setSuccess(`Pembayaran bulan ${namaBulan[editModal.bulan - 1]} berhasil ${statusText}!\n${santriInfo}`);
         setEditModal({ show: false, payment: null, bulan: null, editNominal: '', editPin: '', editLunas: true });
+        setMetodeBayar('Tunai');
         await fetchStatusList(tahun, selectedSantri.id);
         await fetchPaidPayments(selectedSantri.id, tahun);
         setTimeout(() => setSuccess(''), 3000);
@@ -569,6 +570,7 @@ function BayarPageInner() {
                       setPaidPayments({});
                       setAbaikanAturanNominal(false);
                       setNominal(santri.nominal_spp || 0);
+                      setMetodeBayar('Tunai');
                       fetchPaidPayments(santri.id, tahun);
                     }}
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
