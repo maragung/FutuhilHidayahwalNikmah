@@ -113,7 +113,17 @@ export async function POST(request) {
     }
     
     const body = await request.json();
-    const { santri_id, bulan_list, tahun_spp, nominal_per_bulan, metode_bayar, keterangan, pin, abaikan_aturan_nominal } = body;
+    const { 
+      santri_id, 
+      bulan_list, 
+      tahun_spp, 
+      nominal_per_bulan, 
+      status_bayar,
+      metode_bayar, 
+      keterangan, 
+      pin, 
+      abaikan_aturan_nominal 
+    } = body;
     const santriId = readPositiveInteger(santri_id, 'Santri');
     const tahunInt = readPositiveInteger(tahun_spp, 'Tahun SPP');
     const bulanList = [...new Set(
@@ -121,7 +131,8 @@ export async function POST(request) {
         .map((bulan) => Number.parseInt(bulan, 10))
         .filter((bulan) => Number.isInteger(bulan) && bulan >= 1 && bulan <= 12)
     )].sort((a, b) => a - b);
-    const metodeBayar = readEnumValue(metode_bayar, 'Metode bayar', ['Tunai', 'Transfer'], 'Tunai');
+    const metodeBayar = readEnumValue(metode_bayar, 'Metode bayar', ['Tunai', 'Transfer', 'Belum Lunas'], 'Tunai');
+    const statusBayar = readEnumValue(status_bayar, 'Status bayar', ['lunas', 'belum_lunas'], 'lunas');
     const keteranganText = readOptionalText(keterangan, { max: 500 });
 
     if (tahunInt < 2000 || tahunInt > 2100) {
@@ -296,7 +307,7 @@ export async function POST(request) {
     for (const bulan of bulanList) {
       const kodeInvoice = generateKodeInvoice('SPP', timeConfig);
       const tanggalTransaksi = resolveSppTransactionDate(tahunInt, bulan);
-      
+
       const pembayaran = await PembayaranSPP.create({
         kode_invoice: kodeInvoice,
         santri_id: santriId,
@@ -305,26 +316,29 @@ export async function POST(request) {
         bulan_spp: bulan,
         tahun_spp: tahunInt,
         nominal: nominalPerBulan,
+        status_bayar: statusBayar,
         metode_bayar: metodeBayar,
         keterangan: keteranganText,
       }, { transaction: t });
-      
+
       pembayaranList.push(pembayaran);
-      
-      // Update saldo
-      saldoBerjalan += nominalPerBulan;
-      
-      // Catat ke jurnal kas
-      await JurnalKas.create({
-        tgl_transaksi: tanggalTransaksi,
-        tanggal_aksi: tanggalTransaksi,
-        jenis: 'Masuk',
-        nominal: nominalPerBulan,
-        referensi_kode: kodeInvoice,
-        keterangan: `SPP ${santri.nama_lengkap} - Bulan ${bulan}/${tahunInt}`,
-        saldo_berjalan: saldoBerjalan,
-        admin_id: auth.user.id,
-      }, { transaction: t });
+
+      // Update saldo - hanya jika lunas atau tunai/transfer
+      if (statusBayar === 'lunas' && metodeBayar !== 'Belum Lunas') {
+        saldoBerjalan += nominalPerBulan;
+
+        // Catat ke jurnal kas
+        await JurnalKas.create({
+          tgl_transaksi: tanggalTransaksi,
+          tanggal_aksi: tanggalTransaksi,
+          jenis: 'Masuk',
+          nominal: nominalPerBulan,
+          referensi_kode: kodeInvoice,
+          keterangan: `SPP ${santri.nama_lengkap} - Bulan ${bulan}/${tahunInt}`,
+          saldo_berjalan: saldoBerjalan,
+          admin_id: auth.user.id,
+        }, { transaction: t });
+      }
     }
     
     await t.commit();
@@ -527,6 +541,175 @@ export async function DELETE(request) {
       return NextResponse.json({ success: false, pesan: error.message }, { status: 400 });
     }
     console.error('Batch delete pembayaran error:', error);
+    return NextResponse.json(
+      { success: false, pesan: 'Terjadi kesalahan server' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update nominal pembayaran (untuk pembayaran belum lunas)
+export async function PUT(request) {
+  let t;
+
+  try {
+    await sequelize.authenticate();
+
+    const auth = await verifyAuth(request);
+    if (!auth.success) {
+      return NextResponse.json(
+        { success: false, pesan: auth.error },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { id, nominal, status_bayar, metode_bayar, pin } = body;
+
+    const pembayaranId = readPositiveInteger(id, 'ID Pembayaran');
+
+    const pinCheck = await verifyAdminPin(auth.user.id, pin);
+    if (!pinCheck.success) {
+      return NextResponse.json({ success: false, pesan: pinCheck.pesan }, pinCheck.status);
+    }
+
+    const pembayaran = await PembayaranSPP.findByPk(pembayaranId);
+    if (!pembayaran) {
+      return NextResponse.json({ success: false, pesan: 'Pembayaran tidak ditemukan' }, 404);
+    }
+
+    t = await sequelize.transaction();
+
+    // Hitung selisih untuk jurnal kas
+    const oldNominal = parseFloat(pembayaran.nominal);
+    const oldStatus = pembayaran.status_bayar;
+    const oldMetode = pembayaran.metode_bayar;
+
+    let newNominal = oldNominal;
+    let newStatus = oldStatus;
+    let newMetode = oldMetode;
+
+    if (nominal !== undefined) {
+      newNominal = parseFloat(nominal);
+      if (!Number.isFinite(newNominal) || newNominal <= 0) {
+        await t.rollback();
+        return NextResponse.json({ success: false, pesan: 'Nominal tidak valid' }, 400);
+      }
+      pembayaran.nominal = newNominal;
+    }
+
+    if (status_bayar !== undefined) {
+      newStatus = status_bayar;
+      if (!['lunas', 'belum_lunas'].includes(newStatus)) {
+        await t.rollback();
+        return NextResponse.json({ success: false, pesan: 'Status bayar tidak valid' }, 400);
+      }
+      pembayaran.status_bayar = newStatus;
+    }
+
+    if (metode_bayar !== undefined) {
+      newMetode = metode_bayar;
+      if (!['Tunai', 'Transfer', 'Belum Lunas'].includes(newMetode)) {
+        await t.rollback();
+        return NextResponse.json({ success: false, pesan: 'Metode bayar tidak valid' }, 400);
+      }
+      pembayaran.metode_bayar = newMetode;
+    }
+
+    await pembayaran.save({ transaction: t });
+
+    // Update jurnal kas jika ada perubahan nominal atau status
+    if (nominal !== undefined || status_bayar !== undefined || metode_bayar !== undefined) {
+      const lastJurnal = await JurnalKas.findOne({
+        order: [['id', 'DESC']],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      let saldoBerjalan = lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0;
+
+      // Jika dari belum_lunas jadi lunas, tambahkan ke kas
+      if ((oldStatus === 'belum_lunas' || oldMetode === 'Belum Lunas') && 
+          (newStatus === 'lunas' && newMetode !== 'Belum Lunas')) {
+        saldoBerjalan += newNominal;
+        await JurnalKas.create({
+          tgl_transaksi: new Date(),
+          tanggal_aksi: new Date(),
+          jenis: 'Masuk',
+          nominal: newNominal,
+          referensi_kode: `ADJ-${pembayaran.kode_invoice}`,
+          keterangan: `Pelunasan SPP ${pembayaran.santri_id} - Bulan ${pembayaran.bulan_spp}/${pembayaran.tahun_spp}`,
+          saldo_berjalan: saldoBerjalan,
+          admin_id: auth.user.id,
+        }, { transaction: t });
+      }
+
+      // Jika dari lunas jadi belum_lunas atau ada perubahan nominal
+      if (nominal !== undefined && newNominal !== oldNominal) {
+        const selisih = newNominal - oldNominal;
+        
+        // Jika masih lunas dan ada perubahan nominal
+        if (newStatus === 'lunas' && newMetode !== 'Belum Lunas') {
+          if (selisih > 0) {
+            // Tambahan bayar
+            saldoBerjalan += selisih;
+            await JurnalKas.create({
+              tgl_transaksi: new Date(),
+              tanggal_aksi: new Date(),
+              jenis: 'Masuk',
+              nominal: selisih,
+              referensi_kode: `ADJ-${pembayaran.kode_invoice}`,
+              keterangan: `Penyesuaian SPP ${pembayaran.santri_id} - Bulan ${pembayaran.bulan_spp}/${pembayaran.tahun_spp}`,
+              saldo_berjalan: saldoBerjalan,
+              admin_id: auth.user.id,
+            }, { transaction: t });
+          } else if (selisih < 0) {
+            // Kurangi bayar
+            saldoBerjalan += selisih; // selisih negatif
+            await JurnalKas.create({
+              tgl_transaksi: new Date(),
+              tanggal_aksi: new Date(),
+              jenis: 'Keluar',
+              nominal: Math.abs(selisih),
+              referensi_kode: `ADJ-${pembayaran.kode_invoice}`,
+              keterangan: `Penyesuaian SPP ${pembayaran.santri_id} - Bulan ${pembayaran.bulan_spp}/${pembayaran.tahun_spp}`,
+              saldo_berjalan: saldoBerjalan,
+              admin_id: auth.user.id,
+            }, { transaction: t });
+          }
+        }
+      }
+    }
+
+    await t.commit();
+
+    await createBackup('Update Pembayaran SPP', 'pembayaran_spp', pembayaran.id, pembayaran, auth.user.id);
+
+    try {
+      await Log.create({
+        level: 'INFO',
+        context: 'PEMBAYARAN_SPP_UPDATE',
+        message: `[${auth.user.username}] Update pembayaran SPP ID ${pembayaranId}`,
+        detail: JSON.stringify({ 
+          pembayaran_id: pembayaranId,
+          nominal_baru: newNominal,
+          status_bayar_baru: newStatus,
+          admin_id: auth.user.id 
+        }),
+      });
+    } catch (_) {}
+
+    return NextResponse.json({
+      success: true,
+      pesan: 'Pembayaran berhasil diupdate',
+      data: pembayaran,
+    });
+
+  } catch (error) {
+    if (t) { try { await t.rollback(); } catch (_) {} }
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ success: false, pesan: error.message }, { status: 400 });
+    }
+    console.error('Update pembayaran error:', error);
     return NextResponse.json(
       { success: false, pesan: 'Terjadi kesalahan server' },
       { status: 500 }

@@ -18,7 +18,6 @@ const EmailServer = require('./EmailServer');
 const EmailLog = require('./EmailLog');
 const BukuPrestasiSantri = require('./BukuPrestasiSantri');
 const IdempotencyKey = require('./IdempotencyKey');
-const Titipan = require('./Titipan');
 
 // Relasi Role
 Role.hasMany(Admin, { foreignKey: 'role_id', as: 'admins' });
@@ -38,8 +37,6 @@ Admin.hasMany(PembayaranLain, { foreignKey: 'admin_id', as: 'pembayaranLain' });
 // Relasi Santri
 Santri.hasMany(PembayaranSPP, { foreignKey: 'santri_id', as: 'pembayaran' });
 Santri.hasMany(PembayaranLain, { foreignKey: 'santri_id', as: 'pembayaranLain' });
-Santri.hasMany(Titipan, { foreignKey: 'santri_id', as: 'titipan' });
-Titipan.belongsTo(Santri, { foreignKey: 'santri_id', as: 'santri' });
 
 // Relasi PembayaranSPP
 PembayaranSPP.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });

@@ -33,6 +33,7 @@ function BayarPageInner() {
   const [paidPayments, setPaidPayments] = useState({});
   const [pin, setPin] = useState('');
   const [cancelModal, setCancelModal] = useState({ show: false, payment: null, bulan: null, cancelPin: '' });
+  const [editModal, setEditModal] = useState({ show: false, payment: null, bulan: null, editNominal: '', editPin: '' });
   const [selectedCancelBulan, setSelectedCancelBulan] = useState([]);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [canAbaikanNominal, setCanAbaikanNominal] = useState(false);
@@ -185,6 +186,7 @@ function BayarPageInner() {
             id:           p.id,
             kode_invoice: p.kode_invoice,
             nominal:      p.nominal,
+            status_bayar: p.status_bayar,
             tgl_bayar:    p.tgl_bayar,
             metode_bayar: p.metode_bayar,
           };
@@ -260,7 +262,7 @@ function BayarPageInner() {
   const handleSubmit = async () => {
     if (!selectedSantri || selectedBulan.length === 0) return;
     if (!pin) { setError('PIN wajib diisi untuk verifikasi'); return; }
-    
+
     // Cek apakah ada bulan nonaktif yang dipilih
     let hasNonaktifMonth = false;
     for (const bulan of selectedBulan) {
@@ -270,13 +272,13 @@ function BayarPageInner() {
         break;
       }
     }
-    
+
     // Jika ada bulan nonaktif, wajib input nominal manual
     if (hasNonaktifMonth && !abaikanAturanNominal) {
-      setError('Bulan nonaktif memerlukan input nominal manual. Harap centang "Input nominal manual".'); 
+      setError('Bulan nonaktif memerlukan input nominal manual. Harap centang "Input nominal manual".');
       return;
     }
-    
+
     setSubmitLoading(true);
     setError('');
     const token = localStorage.getItem('auth_token');
@@ -295,6 +297,7 @@ function BayarPageInner() {
           bulan_list:             selectedBulan,
           tahun_spp:              tahun,
           nominal_per_bulan:      nominal,
+          status_bayar:           metodeBayar === 'Belum Lunas' ? 'belum_lunas' : 'lunas',
           abaikan_aturan_nominal: abaikanAturanNominal,
           metode_bayar:           metodeBayar,
           pin,
@@ -356,6 +359,51 @@ function BayarPageInner() {
       setError('Terjadi kesalahan saat membatalkan pembayaran');
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  // ── Edit pembayaran (update nominal) ───────────────────────────────────────
+  const handleEditPayment = async () => {
+    if (!editModal.editNominal || !editModal.editPin) {
+      setError('Nominal dan PIN wajib diisi');
+      return;
+    }
+
+    setSubmitLoading(true);
+    setError('');
+    const token = localStorage.getItem('auth_token');
+    
+    try {
+      const res = await fetch('/api/pembayaran', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: editModal.payment.id,
+          nominal: parseFloat(editModal.editNominal),
+          status_bayar: 'lunas',
+          metode_bayar: 'Tunai',
+          pin: editModal.editPin,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setSuccess(`Pembayaran bulan ${namaBulan[editModal.bulan - 1]} berhasil dilunasi!`);
+        setEditModal({ show: false, payment: null, bulan: null, editNominal: '', editPin: '' });
+        await fetchStatusList(tahun, selectedSantri.id);
+        await fetchPaidPayments(selectedSantri.id, tahun);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(data.pesan);
+      }
+    } catch {
+      setError('Gagal mengupdate pembayaran');
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
@@ -649,6 +697,30 @@ function BayarPageInner() {
 
                   // Sudah lunas → hijau, klik untuk detail/batalkan
                   if (dibayar) {
+                    const payment = paidPayments[bulan];
+                    const isBelumLunas = payment?.status_bayar === 'belum_lunas' || payment?.metode_bayar === 'Belum Lunas';
+                    
+                    if (isBelumLunas) {
+                      // Belum lunas → orange dengan simbol peringatan
+                      return (
+                        <button key={bulan}
+                          onClick={() => setEditModal({ 
+                            show: true, 
+                            payment: payment, 
+                            bulan: bulan, 
+                            editNominal: String(nominal), 
+                            editPin: '' 
+                          })}
+                          className="p-3 rounded-lg border-2 bg-orange-100 border-orange-300 text-orange-700 text-center hover:bg-orange-200 transition-colors"
+                          title={`${nama} – Belum Lunas (${formatCurrency(payment?.nominal || 0)}) - Klik untuk edit`}>
+                          <p className="text-sm font-medium">{nama.substring(0,3)}</p>
+                          <p className="text-xs mt-0.5">⚠️</p>
+                          <p className="text-xs mt-0.5">{formatCurrency(payment?.nominal || 0)}</p>
+                        </button>
+                      );
+                    }
+                    
+                    // Lunas → hijau dengan centang
                     return (
                       <button key={bulan}
                         className="p-3 rounded-lg border-2 bg-green-100 border-green-300 text-green-700 text-center hover:bg-green-200 transition-colors"
@@ -739,7 +811,13 @@ function BayarPageInner() {
                   <select value={metodeBayar} onChange={(e) => setMetodeBayar(e.target.value)} className="input-field">
                     <option value="Tunai">Tunai</option>
                     <option value="Transfer">Transfer</option>
+                    <option value="Belum Lunas">Belum Lunas</option>
                   </select>
+                  {metodeBayar === 'Belum Lunas' && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      ⚠️ Pembayaran akan ditandai sebagai "Belum Lunas" dengan simbol peringatan ⚠️
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -905,6 +983,76 @@ function BayarPageInner() {
               <button onClick={() => { setCancelModal({ show: false, payment: null, bulan: null, cancelPin: '' }); setSelectedCancelBulan([]); }} className="btn-secondary flex-1">Tidak</button>
               <button onClick={handleCancelPayment} disabled={cancelLoading||!cancelModal.cancelPin||selectedCancelBulan.length===0} className="btn-danger flex-1">
                 {cancelLoading ? 'Membatalkan...' : 'Ya, Batalkan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Edit Pembayaran (Pelunasan) ────────────────────────────────── */}
+      {editModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Pelunasan Pembayaran</h3>
+            <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-xs font-medium text-orange-700 mb-1">Pembayaran Belum Lunas:</p>
+              <p className="text-sm text-orange-800 font-semibold">
+                Bulan {editModal.bulan ? namaBulan[editModal.bulan - 1] : ''}
+              </p>
+            </div>
+            <div className="space-y-3 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Nominal Saat Ini</span>
+                <span className="font-medium">{formatCurrency(editModal.payment?.nominal || 0)}</span>
+              </div>
+              <hr className="my-2" />
+              <div className="flex justify-between text-lg font-bold">
+                <span>Update Nominal</span>
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nominal Pelunasan
+              </label>
+              <input 
+                type="number" 
+                value={editModal.editNominal}
+                onChange={(e) => setEditModal(prev => ({ ...prev, editNominal: e.target.value }))}
+                placeholder="Masukkan nominal pelunasan" 
+                className="input-field" 
+                autoFocus 
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Akan diubah menjadi lunas dengan nominal ini
+              </p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                PIN Verifikasi <span className="text-red-500">*</span>
+              </label>
+              <input 
+                type="password" 
+                value={editModal.editPin}
+                onChange={(e) => setEditModal(prev => ({ ...prev, editPin: e.target.value }))}
+                onKeyDown={(e) => { if (e.key==='Enter' && editModal.editPin && !submitLoading) handleEditPayment(); }}
+                placeholder="Masukkan PIN Anda" 
+                className="input-field" 
+                maxLength={8} 
+              />
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => { setEditModal({ show: false, payment: null, bulan: null, editNominal: '', editPin: '' }); }} 
+                className="btn-secondary flex-1"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleEditPayment} 
+                disabled={submitLoading || !editModal.editPin} 
+                className="btn-primary flex-1"
+              >
+                {submitLoading ? 'Memproses...' : 'Lunasi'}
               </button>
             </div>
           </div>

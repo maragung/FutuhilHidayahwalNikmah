@@ -48,9 +48,16 @@ const PembayaranSPP = sequelize.define('PembayaranSPP', {
   nominal: {
     type: DataTypes.DECIMAL(15, 2),
     allowNull: false,
+    comment: 'Nominal yang dibayarkan',
+  },
+  status_bayar: {
+    type: DataTypes.ENUM('lunas', 'belum_lunas'),
+    allowNull: false,
+    defaultValue: 'lunas',
+    comment: 'lunas = sudah bayar penuh, belum_lunas = bayar parsial',
   },
   metode_bayar: {
-    type: DataTypes.ENUM('Tunai', 'Transfer'),
+    type: DataTypes.ENUM('Tunai', 'Transfer', 'Belum Lunas'),
     allowNull: false,
     defaultValue: 'Tunai',
   },

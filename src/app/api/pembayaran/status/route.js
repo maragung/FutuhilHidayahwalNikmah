@@ -90,7 +90,7 @@ export async function GET(request) {
         bulan: p.bulan_spp,
       });
     });
-    
+
     // Gabungkan data santri dengan status pembayaran
     const result = santriList.map(santri => {
       const payments = paymentMap[santri.id] || {};
@@ -204,7 +204,7 @@ export async function GET(request) {
         bulan_belum_bayar: Math.max(bulanWajib - bulanTerbayar, 0),
       };
     });
-    
+
     return NextResponse.json({
       success: true,
       data: result,
