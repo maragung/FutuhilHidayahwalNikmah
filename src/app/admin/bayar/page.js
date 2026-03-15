@@ -312,7 +312,10 @@ function BayarPageInner() {
       });
       const data = await res.json();
       if (data.success) {
-        setSuccess(`Pembayaran ${selectedBulan.length} bulan berhasil dicatat!`);
+        const santriInfo = selectedSantri?.no_absen != null 
+          ? `#${selectedSantri.no_absen} - ${selectedSantri.nama_lengkap}`
+          : selectedSantri?.nama_lengkap;
+        setSuccess(`Pembayaran ${selectedBulan.length} bulan berhasil dicatat!\n${santriInfo}`);
         setShowConfirm(false);
         setSelectedBulan([]);
         setPin('');
@@ -350,10 +353,13 @@ function BayarPageInner() {
       });
       const data = await res.json();
       if (data.success) {
+        const santriInfo = selectedSantri?.no_absen != null 
+          ? `#${selectedSantri.no_absen} - ${selectedSantri.nama_lengkap}`
+          : selectedSantri?.nama_lengkap;
         if (selectedCancelBulan.length > 1) {
-          setSuccess(`${selectedCancelBulan.length} pembayaran berhasil dibatalkan`);
+          setSuccess(`${selectedCancelBulan.length} pembayaran berhasil dibatalkan\n${santriInfo}`);
         } else {
-          setSuccess(`Pembayaran bulan ${namaBulan[cancelModal.bulan - 1]} berhasil dibatalkan`);
+          setSuccess(`Pembayaran bulan ${namaBulan[cancelModal.bulan - 1]} berhasil dibatalkan\n${santriInfo}`);
         }
         setCancelModal({ show: false, payment: null, bulan: null, cancelPin: '' });
         setSelectedCancelBulan([]);
@@ -399,8 +405,11 @@ function BayarPageInner() {
       const data = await res.json();
       
       if (data.success) {
+        const santriInfo = selectedSantri?.no_absen != null 
+          ? `#${selectedSantri.no_absen} - ${selectedSantri.nama_lengkap}`
+          : selectedSantri?.nama_lengkap;
         const statusText = editModal.editLunas ? 'dilunasi' : 'dibayar (belum lunas)';
-        setSuccess(`Pembayaran bulan ${namaBulan[editModal.bulan - 1]} berhasil ${statusText}!`);
+        setSuccess(`Pembayaran bulan ${namaBulan[editModal.bulan - 1]} berhasil ${statusText}!\n${santriInfo}`);
         setEditModal({ show: false, payment: null, bulan: null, editNominal: '', editPin: '', editLunas: true });
         await fetchStatusList(tahun, selectedSantri.id);
         await fetchPaidPayments(selectedSantri.id, tahun);
