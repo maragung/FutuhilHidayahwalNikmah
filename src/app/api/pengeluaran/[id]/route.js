@@ -55,6 +55,9 @@ export async function PUT(request, { params }) {
     const dataSebelum = pengeluaran.toJSON();
     const nominalLama = Number(pengeluaran.nominal);
     const nominalBaru = body.nominal !== undefined ? Number(body.nominal) : nominalLama;
+    
+    // Save the original expense date BEFORE update for jurnal adjustment
+    const tglKeluarAsli = pengeluaran.tgl_keluar;
 
     // Validate nominal
     if (isNaN(nominalBaru) || nominalBaru < 0) {
@@ -94,8 +97,9 @@ export async function PUT(request, { params }) {
       const saldo = (lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0) - diff;
       console.log('[PUT /api/pengeluaran/:id] Last jurnal saldo:', lastJurnal ? lastJurnal.saldo_berjalan : 0, 'New saldo:', saldo);
 
-      // Use the expense date for the adjustment entry, not today's date
-      const tglPenyesuaian = pengeluaran.tgl_keluar ? new Date(pengeluaran.tgl_keluar) : new Date();
+      // Use the ORIGINAL expense date for adjustment (before update)
+      // This ensures the adjustment appears in the correct accounting period
+      const tglPenyesuaian = tglKeluarAsli ? new Date(tglKeluarAsli) : new Date();
 
       await JurnalKas.create({
         tgl_transaksi: tglPenyesuaian,
