@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { Pengeluaran, Admin, JurnalKas } from '@/lib/models';
 import sequelize from '@/lib/db';
-import { Op } from 'sequelize';
 import { createBackup, buildSafeJurnalRef } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
@@ -57,21 +56,6 @@ export async function PUT(request, { params }) {
     const nominalLama = Number(pengeluaran.nominal);
     const nominalBaru = body.nominal !== undefined ? Number(body.nominal) : nominalLama;
 
-    // Save the ORIGINAL expense date for journal reversal
-    const tglKeluarAsli = pengeluaran.tgl_keluar;
-    
-    // Determine the NEW date (may be same as original if not changed)
-    let tglKeluarBaru = tglKeluarAsli;
-    if (body.tgl_keluar) {
-      const dateStr = String(body.tgl_keluar).substring(0, 10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const parsedDate = new Date(dateStr + 'T00:00:00');
-        if (!isNaN(parsedDate.getTime())) {
-          tglKeluarBaru = dateStr;
-        }
-      }
-    }
-
     // Validate nominal
     if (isNaN(nominalBaru) || nominalBaru < 0) {
       await t.rollback();
@@ -109,125 +93,10 @@ export async function PUT(request, { params }) {
     await pengeluaran.update(updateData, { transaction: t });
     console.log('[PUT /api/pengeluaran/:id] Update successful');
 
-    const diff = nominalBaru - nominalLama;
-    console.log('[PUT /api/pengeluaran/:id] Nominal diff:', diff);
-    console.log('[PUT /api/pengeluaran/:id] Date changed from', tglKeluarAsli, 'to', tglKeluarBaru);
-
-    // Handle journal entries for date change and/or nominal change
-    if (tglKeluarAsli !== tglKeluarBaru || diff !== 0) {
-      console.log('[PUT /api/pengeluaran/:id] Creating jurnal kas adjustment...');
-      
-      if (tglKeluarAsli !== tglKeluarBaru && diff === 0) {
-        // Only date changed, nominal same: Reverse at old date, add at new date
-        console.log('[PUT /api/pengeluaran/:id] Date change only, creating reversal and re-entry...');
-        
-        // Reverse at old date
-        const lastJurnalOld = await JurnalKas.findOne({ 
-          where: { tgl_transaksi: { [Op.lte]: tglKeluarAsli } },
-          order: [['tgl_transaksi', 'DESC'], ['id', 'DESC']],
-          transaction: t, 
-          lock: t.LOCK.UPDATE 
-        });
-        const saldoOld = (lastJurnalOld ? Number(lastJurnalOld.saldo_berjalan) : 0) + nominalLama;
-        
-        await JurnalKas.create({
-          tgl_transaksi: tglKeluarAsli,
-          tanggal_aksi: tglKeluarAsli,
-          jenis: 'Masuk', // Reverse the expense (money comes back)
-          nominal: nominalLama,
-          referensi_kode: buildSafeJurnalRef('ADJ', pengeluaran.kode_pengeluaran, pengeluaran.id, 'OLD'),
-          keterangan: `Penyesuaian tanggal pengeluaran ${pengeluaran.kode_pengeluaran} (dari ${tglKeluarAsli})`,
-          saldo_berjalan: saldoOld,
-          admin_id: auth.user.id,
-        }, { transaction: t });
-        
-        // Add at new date
-        const lastJurnalNew = await JurnalKas.findOne({ 
-          where: { tgl_transaksi: { [Op.lte]: tglKeluarBaru } },
-          order: [['tgl_transaksi', 'DESC'], ['id', 'DESC']],
-          transaction: t, 
-          lock: t.LOCK.UPDATE 
-        });
-        const saldoNew = (lastJurnalNew ? Number(lastJurnalNew.saldo_berjalan) : 0) - nominalBaru;
-        
-        await JurnalKas.create({
-          tgl_transaksi: tglKeluarBaru,
-          tanggal_aksi: tglKeluarBaru,
-          jenis: 'Keluar', // Record the expense again (money goes out)
-          nominal: nominalBaru,
-          referensi_kode: buildSafeJurnalRef('ADJ', pengeluaran.kode_pengeluaran, pengeluaran.id, 'NEW'),
-          keterangan: `Penyesuaian tanggal pengeluaran ${pengeluaran.kode_pengeluaran} (ke ${tglKeluarBaru})`,
-          saldo_berjalan: saldoNew,
-          admin_id: auth.user.id,
-        }, { transaction: t });
-        
-      } else if (tglKeluarAsli !== tglKeluarBaru && diff !== 0) {
-        // Both date and nominal changed: Reverse full amount at old date, add full amount at new date
-        console.log('[PUT /api/pengeluaran/:id] Date and nominal changed, creating full reversal and re-entry...');
-        
-        // Reverse at old date
-        const lastJurnalOld = await JurnalKas.findOne({ 
-          where: { tgl_transaksi: { [Op.lte]: tglKeluarAsli } },
-          order: [['tgl_transaksi', 'DESC'], ['id', 'DESC']],
-          transaction: t, 
-          lock: t.LOCK.UPDATE 
-        });
-        const saldoOld = (lastJurnalOld ? Number(lastJurnalOld.saldo_berjalan) : 0) + nominalLama;
-        
-        await JurnalKas.create({
-          tgl_transaksi: tglKeluarAsli,
-          tanggal_aksi: tglKeluarAsli,
-          jenis: 'Masuk',
-          nominal: nominalLama,
-          referensi_kode: buildSafeJurnalRef('ADJ', pengeluaran.kode_pengeluaran, pengeluaran.id, 'OLD'),
-          keterangan: `Penyesuaian pengeluaran ${pengeluaran.kode_pengeluaran} (dari ${tglKeluarAsli})`,
-          saldo_berjalan: saldoOld,
-          admin_id: auth.user.id,
-        }, { transaction: t });
-        
-        // Add at new date with new nominal
-        const lastJurnalNew = await JurnalKas.findOne({ 
-          where: { tgl_transaksi: { [Op.lte]: tglKeluarBaru } },
-          order: [['tgl_transaksi', 'DESC'], ['id', 'DESC']],
-          transaction: t, 
-          lock: t.LOCK.UPDATE 
-        });
-        const saldoNew = (lastJurnalNew ? Number(lastJurnalNew.saldo_berjalan) : 0) - nominalBaru;
-        
-        await JurnalKas.create({
-          tgl_transaksi: tglKeluarBaru,
-          tanggal_aksi: tglKeluarBaru,
-          jenis: 'Keluar',
-          nominal: nominalBaru,
-          referensi_kode: buildSafeJurnalRef('ADJ', pengeluaran.kode_pengeluaran, pengeluaran.id, 'NEW'),
-          keterangan: `Penyesuaian pengeluaran ${pengeluaran.kode_pengeluaran} (ke ${tglKeluarBaru})`,
-          saldo_berjalan: saldoNew,
-          admin_id: auth.user.id,
-        }, { transaction: t });
-        
-      } else {
-        // Only nominal changed, date same: Just adjust the difference at the same date
-        const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
-        const saldo = (lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0) - diff;
-        console.log('[PUT /api/pengeluaran/:id] Last jurnal saldo:', lastJurnal ? lastJurnal.saldo_berjalan : 0, 'New saldo:', saldo);
-
-        // Use the expense date for adjustment
-        const tglPenyesuaian = updateData.tgl_keluar ? new Date(updateData.tgl_keluar) : new Date();
-
-        await JurnalKas.create({
-          tgl_transaksi: tglPenyesuaian,
-          tanggal_aksi: tglPenyesuaian,
-          jenis: diff >= 0 ? 'Keluar' : 'Masuk',
-          nominal: Math.abs(diff),
-          referensi_kode: buildSafeJurnalRef('ADJ', pengeluaran.kode_pengeluaran, pengeluaran.id),
-          keterangan: `Penyesuaian pengeluaran ${pengeluaran.kode_pengeluaran}`,
-          saldo_berjalan: saldo,
-          admin_id: auth.user.id,
-        }, { transaction: t });
-      }
-      console.log('[PUT /api/pengeluaran/:id] Jurnal kas adjustment created');
-    }
-
+    // No journal adjustment needed for expense updates
+    // The expense is already recorded in the original journal entry
+    // Changes to date/nominal are tracked in the pengeluaran table itself
+    
     console.log('[PUT /api/pengeluaran/:id] Committing transaction...');
     await t.commit();
     console.log('[PUT /api/pengeluaran/:id] Transaction committed');
@@ -290,24 +159,6 @@ export async function DELETE(request, { params }) {
     }
 
     const dataSebelum = pengeluaran.toJSON();
-
-    // Delete any ADJ journals related to this pengeluaran first (cleanup from previous edits)
-    const adjJournals = await JurnalKas.findAll({
-      where: {
-        referensi_kode: {
-          [Op.like]: `ADJ-${pengeluaran.kode_pengeluaran}%`
-        }
-      },
-      transaction: t
-    });
-    
-    for (const adjJournal of adjJournals) {
-      await adjJournal.destroy({ transaction: t });
-    }
-    
-    if (adjJournals.length > 0) {
-      console.log(`[DELETE] Cleaned up ${adjJournals.length} ADJ journals for pengeluaran ${pengeluaran.id}`);
-    }
 
     // Use the expense date for the reversal entry, not today's date
     const tglPembatalan = pengeluaran.tgl_keluar ? new Date(pengeluaran.tgl_keluar) : new Date();

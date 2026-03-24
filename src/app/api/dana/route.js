@@ -105,6 +105,11 @@ export async function GET(request) {
       group: ['kategori'],
       raw: true,
     });
+
+    // Hitung jumlah pengeluaran dari tabel Pengeluaran (bukan JurnalKas)
+    const jumlahPengeluaran = await Pengeluaran.count({
+      where: { tgl_keluar: { [Op.between]: [startDate, endDate] } },
+    });
     
     // Ringkasan bulanan tahun ini
     const ringkasanBulanan = [];
@@ -167,6 +172,7 @@ export async function GET(request) {
         total_infak_tahun: totalInfak,
         total_pengeluaran_tahun: totalPengeluaranJurnalTahun,
         total_pengeluaran_manual_tahun: totalPengeluaran,
+        jumlah_pengeluaran: jumlahPengeluaran,
         netto_tahun: totalPemasukanTahun - totalPengeluaranJurnalTahun,
         pengeluaran_per_kategori: pengeluaranPerKategori,
         ringkasan_bulanan: ringkasanBulanan,
