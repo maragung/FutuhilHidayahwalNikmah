@@ -26,7 +26,7 @@ const JurnalKas = sequelize.define('JurnalKas', {
     allowNull: false,
   },
   referensi_kode: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(50),
     allowNull: false,
   },
   keterangan: {

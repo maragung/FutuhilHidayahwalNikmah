@@ -36,6 +36,24 @@ export async function createBackup(aksi, tabel, dataSebelum, dataSesudah, adminI
   }
 }
 
+/**
+ * Builds a safe reference code for JurnalKas entries.
+ * Ensures the code fits within the VARCHAR(50) column limit.
+ * @param {string} prefix - Prefix like 'ADJ', 'REV', etc.
+ * @param {string} kode - The transaction code (e.g., kode_pengeluaran, kode_invoice)
+ * @param {number|string} id - Fallback ID if code is too long
+ * @returns {string} Safe reference code max 50 characters
+ */
+export function buildSafeJurnalRef(prefix, kode, id) {
+  const raw = `${prefix}-${String(kode || '').replace(/\s+/g, '')}`;
+  if (raw.length <= 50) return raw;
+
+  const fallback = `${prefix}-${id}`;
+  if (fallback.length <= 50) return fallback;
+
+  return fallback.slice(0, 50);
+}
+
 const kodeMinuteCounter = new Map();
 
 function getDatePartsForZone(now, timeZone) {

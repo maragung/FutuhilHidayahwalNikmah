@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
 import { Pengeluaran, Admin, JurnalKas } from '@/lib/models';
 import sequelize from '@/lib/db';
-import { createBackup } from '@/lib/utils';
+import { createBackup, buildSafeJurnalRef } from '@/lib/utils';
 import { kirimEmailAksiAdmin, getEmailPenerimaPerubahan } from '@/lib/email';
 
 async function verifyPin(adminId, pin) {
@@ -99,7 +99,7 @@ export async function PUT(request, { params }) {
         tanggal_aksi: new Date(),
         jenis: diff >= 0 ? 'Keluar' : 'Masuk',
         nominal: Math.abs(diff),
-        referensi_kode: `ADJ-${pengeluaran.kode_pengeluaran}`,
+        referensi_kode: buildSafeJurnalRef('ADJ', pengeluaran.kode_pengeluaran, pengeluaran.id),
         keterangan: `Penyesuaian pengeluaran ${pengeluaran.kode_pengeluaran}`,
         saldo_berjalan: saldo,
         admin_id: auth.user.id,
@@ -178,7 +178,7 @@ export async function DELETE(request, { params }) {
       tanggal_aksi: new Date(),
       jenis: 'Masuk',
       nominal: Number(pengeluaran.nominal),
-      referensi_kode: `REV-${pengeluaran.kode_pengeluaran}`,
+      referensi_kode: buildSafeJurnalRef('REV', pengeluaran.kode_pengeluaran, pengeluaran.id),
       keterangan: `Pembatalan pengeluaran ${pengeluaran.kode_pengeluaran}`,
       saldo_berjalan: saldo,
       admin_id: auth.user.id,
