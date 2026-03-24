@@ -42,13 +42,15 @@ export async function createBackup(aksi, tabel, dataSebelum, dataSesudah, adminI
  * @param {string} prefix - Prefix like 'ADJ', 'REV', etc.
  * @param {string} kode - The transaction code (e.g., kode_pengeluaran, kode_invoice)
  * @param {number|string} id - Fallback ID if code is too long
+ * @param {string} suffix - Optional suffix like 'OLD', 'NEW', etc.
  * @returns {string} Safe reference code max 50 characters
  */
-export function buildSafeJurnalRef(prefix, kode, id) {
-  const raw = `${prefix}-${String(kode || '').replace(/\s+/g, '')}`;
+export function buildSafeJurnalRef(prefix, kode, id, suffix = '') {
+  const suffixPart = suffix ? `-${suffix}` : '';
+  const raw = `${prefix}-${String(kode || '').replace(/\s+/g, '')}${suffixPart}`;
   if (raw.length <= 50) return raw;
 
-  const fallback = `${prefix}-${id}`;
+  const fallback = `${prefix}-${id}${suffixPart}`;
   if (fallback.length <= 50) return fallback;
 
   return fallback.slice(0, 50);
