@@ -116,6 +116,9 @@ export default function PengeluaranPage() {
     const token = localStorage.getItem('auth_token');
 
     try {
+      const idempotencyKey = createIdempotencyKey('pengeluaran');
+      console.log('Submitting pengeluaran with key:', idempotencyKey);
+      
       const res = await fetch('/api/pengeluaran', {
         method: 'POST',
         headers: {
@@ -123,7 +126,7 @@ export default function PengeluaranPage() {
           Authorization: `Bearer ${token}`,
           'x-client-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
           'x-client-tz-offset': String(-new Date().getTimezoneOffset()),
-          'x-idempotency-key': createIdempotencyKey('pengeluaran')
+          'x-idempotency-key': idempotencyKey
         },
         body: JSON.stringify({
           judul: formData.judul,
@@ -136,6 +139,7 @@ export default function PengeluaranPage() {
       });
 
       const data = await res.json();
+      console.log('Response:', data);
 
       if (data.success) {
         setSuccess('Pengeluaran berhasil dicatat!');
@@ -155,7 +159,8 @@ export default function PengeluaranPage() {
         setError(data.pesan);
       }
     } catch (err) {
-      setError('Gagal menyimpan pengeluaran');
+      console.error('Submit pengeluaran error:', err);
+      setError('Gagal menyimpan pengeluaran: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }

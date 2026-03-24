@@ -1,7 +1,7 @@
 export function createIdempotencyKey(prefix = 'req') {
-  const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const randomPart = typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID
+    ? window.crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 15)}`;
 
   return `${prefix}-${randomPart}`;
 }
