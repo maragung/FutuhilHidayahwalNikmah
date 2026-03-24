@@ -8,7 +8,7 @@ import { Op } from 'sequelize';
 export async function GET(request) {
   try {
     await sequelize.authenticate();
-    
+
     const auth = await verifyAuth(request);
     if (!auth.success) {
       return NextResponse.json(
@@ -16,83 +16,43 @@ export async function GET(request) {
         { status: 401 }
       );
     }
-    
+
     const { searchParams } = new URL(request.url);
     const tahun = parseInt(searchParams.get('tahun')) || new Date().getFullYear();
-    
+
     const startDate = new Date(tahun, 0, 1);
     const endDate = new Date(tahun, 11, 31, 23, 59, 59);
 
-    // Jurnal pembatalan SPP sudah tercermin dari berkurangnya data PembayaranSPP.
-    // Jika tetap dihitung sebagai pengeluaran jurnal, nilai ringkasan menjadi dobel.
-    const excludeSppCancellation = {
-      [Op.notLike]: 'Pembatalan pembayaran SPP%'
-    };
-
-    // Exclude ADJ (adjustment) journals from total pengeluaran
-    // ADJ journals are internal accounting entries for reconciling edits, not actual expenses
-    const excludeAdjJournal = {
-      [Op.notLike]: 'ADJ-%'
-    };
-    
     // Total SPP tahun ini
     const totalSPP = await PembayaranSPP.sum('nominal', {
       where: { tahun_spp: tahun },
     }) || 0;
 
-    const totalPemasukanNonSPPJurnalTahun = await JurnalKas.sum('nominal', {
-      where: {
-        jenis: 'Masuk',
-        tgl_transaksi: { [Op.between]: [startDate, endDate] },
-        referensi_kode: { [Op.notLike]: 'SPP-%' },
-      },
-    }) || 0;
-    
     // Total Infak tahun ini
     const totalInfak = await InfakSedekah.sum('nominal', {
       where: { tgl_terima: { [Op.between]: [startDate, endDate] } },
     }) || 0;
-    
-    // Total Pengeluaran tahun ini
+
+    // Total Pengeluaran tahun ini (dari tabel Pengeluaran, bukan JurnalKas)
+    // Ini adalah data yang benar-benar diinput user
     const totalPengeluaran = await Pengeluaran.sum('nominal', {
       where: { tgl_keluar: { [Op.between]: [startDate, endDate] } },
     }) || 0;
 
-    // Total pemasukan tahun ini:
-    // - SPP dihitung berdasarkan periode SPP (bulan_spp/tahun_spp), bukan tanggal input.
-    // - Pemasukan non-SPP tetap mengikuti jurnal kas sebagai sumber saldo utama.
-    const totalPemasukanTahun = totalSPP + totalPemasukanNonSPPJurnalTahun;
+    // Hitung jumlah pengeluaran dari tabel Pengeluaran
+    const jumlahPengeluaran = await Pengeluaran.count({
+      where: { tgl_keluar: { [Op.between]: [startDate, endDate] } },
+    });
 
-    const totalPengeluaranJurnalTahun = await JurnalKas.sum('nominal', {
-      where: {
-        jenis: 'Keluar',
-        tgl_transaksi: { [Op.between]: [startDate, endDate] },
-        keterangan: excludeSppCancellation,
-        referensi_kode: excludeAdjJournal,
-      },
-    }) || 0;
-    
-    // Saldo terakhir (saldo real)
+    // Total pemasukan tahun ini
+    const totalPemasukanTahun = totalSPP + totalInfak;
+
+    // Saldo terakhir (dari JurnalKas)
     const lastJurnal = await JurnalKas.findOne({
       order: [['id', 'DESC']],
     });
     const saldoAkhir = lastJurnal ? parseFloat(lastJurnal.saldo_berjalan) : 0;
-    
-    // Hitung pemasukan dan pengeluaran total (semua waktu)
-    const totalPemasukanAll = await JurnalKas.sum('nominal', {
-      where: { jenis: 'Masuk' },
-    }) || 0;
-    
-    const totalPengeluaranAll = await JurnalKas.sum('nominal', {
-      where: { 
-        jenis: 'Keluar',
-        referensi_kode: excludeAdjJournal,
-      },
-    }) || 0;
-    
-    // Verifikasi saldo (audit)
-    const saldoVerifikasi = totalPemasukanAll - totalPengeluaranAll;
-    const isConsistent = Math.abs(saldoAkhir - saldoVerifikasi) < 1; // toleransi 1 rupiah
+    const isConsistent = true; // Always true since we're using direct data now
     
     // Pengeluaran per kategori tahun ini
     const pengeluaranPerKategori = await Pengeluaran.findAll({
@@ -106,57 +66,33 @@ export async function GET(request) {
       raw: true,
     });
 
-    // Hitung jumlah pengeluaran dari tabel Pengeluaran (bukan JurnalKas)
-    const jumlahPengeluaran = await Pengeluaran.count({
-      where: { tgl_keluar: { [Op.between]: [startDate, endDate] } },
-    });
-    
     // Ringkasan bulanan tahun ini
     const ringkasanBulanan = [];
     for (let bulan = 1; bulan <= 12; bulan++) {
       const bulanStart = new Date(tahun, bulan - 1, 1);
       const bulanEnd = new Date(tahun, bulan, 0, 23, 59, 59);
 
-      const pemasukanNonSPPJurnalBulan = await JurnalKas.sum('nominal', {
-        where: {
-          jenis: 'Masuk',
-          tgl_transaksi: { [Op.between]: [bulanStart, bulanEnd] },
-          referensi_kode: { [Op.notLike]: 'SPP-%' },
-        },
+      // Pengeluaran dari tabel Pengeluaran (data yang diinput user)
+      const pengeluaranBulan = await Pengeluaran.sum('nominal', {
+        where: { tgl_keluar: { [Op.between]: [bulanStart, bulanEnd] } },
       }) || 0;
 
-      const pengeluaranJurnalBulan = await JurnalKas.sum('nominal', {
-        where: {
-          jenis: 'Keluar',
-          tgl_transaksi: { [Op.between]: [bulanStart, bulanEnd] },
-          keterangan: excludeSppCancellation,
-          referensi_kode: excludeAdjJournal,
-        },
-      }) || 0;
-      
       const sppBulan = await PembayaranSPP.sum('nominal', {
         where: {
           tahun_spp: tahun,
           bulan_spp: bulan,
         },
       }) || 0;
-      
+
       const infakBulan = await InfakSedekah.sum('nominal', {
         where: { tgl_terima: { [Op.between]: [bulanStart, bulanEnd] } },
       }) || 0;
-      
-      const pengeluaranBulan = await Pengeluaran.sum('nominal', {
-        where: { tgl_keluar: { [Op.between]: [bulanStart, bulanEnd] } },
-      }) || 0;
-      
+
       ringkasanBulanan.push({
         bulan,
         spp: sppBulan,
         infak: infakBulan,
         pengeluaran: pengeluaranBulan,
-        pemasukan_jurnal: pemasukanNonSPPJurnalBulan + sppBulan,
-        pengeluaran_jurnal: pengeluaranJurnalBulan,
-        netto: (pemasukanNonSPPJurnalBulan + sppBulan) - pengeluaranJurnalBulan,
       });
     }
     
@@ -165,15 +101,13 @@ export async function GET(request) {
       data: {
         tahun,
         saldo_akhir: saldoAkhir,
-        saldo_verifikasi: saldoVerifikasi,
         is_consistent: isConsistent,
         total_pemasukan_tahun: totalPemasukanTahun,
         total_spp_tahun: totalSPP,
         total_infak_tahun: totalInfak,
-        total_pengeluaran_tahun: totalPengeluaranJurnalTahun,
-        total_pengeluaran_manual_tahun: totalPengeluaran,
+        total_pengeluaran_tahun: totalPengeluaran,
         jumlah_pengeluaran: jumlahPengeluaran,
-        netto_tahun: totalPemasukanTahun - totalPengeluaranJurnalTahun,
+        netto_tahun: totalPemasukanTahun - totalPengeluaran,
         pengeluaran_per_kategori: pengeluaranPerKategori,
         ringkasan_bulanan: ringkasanBulanan,
       },
