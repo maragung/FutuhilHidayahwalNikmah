@@ -175,6 +175,12 @@ export default function PengeluaranPage() {
     setError('');
     try {
       const token = localStorage.getItem('auth_token');
+      
+      // Format date properly for API
+      const formattedDate = selectedPengeluaran.tgl_keluar 
+        ? String(selectedPengeluaran.tgl_keluar).substring(0, 10)
+        : new Date().toISOString().split('T')[0];
+      
       const res = await fetch(`/api/pengeluaran/${selectedPengeluaran.id}`, {
         method: 'PUT',
         headers: {
@@ -185,12 +191,23 @@ export default function PengeluaranPage() {
           judul: selectedPengeluaran.judul,
           kategori: selectedPengeluaran.kategori,
           nominal: parseFloat(selectedPengeluaran.nominal),
-          catatan: selectedPengeluaran.catatan,
-          tgl_keluar: selectedPengeluaran.tgl_keluar,
+          catatan: selectedPengeluaran.catatan || '',
+          tgl_keluar: formattedDate,
           pin: selectedPengeluaran.pin_edit,
         })
       });
+      
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('API Error:', errorData);
+        setError(errorData.pesan || `HTTP error: ${res.status}`);
+        return;
+      }
+      
       const data = await res.json();
+      console.log('Response data:', data);
       if (data.success) {
         setSuccess('Data pengeluaran berhasil diperbarui');
         setShowEditModal(false);
@@ -200,8 +217,9 @@ export default function PengeluaranPage() {
       } else {
         setError(data.pesan);
       }
-    } catch {
-      setError('Gagal memperbarui data pengeluaran');
+    } catch (err) {
+      console.error('Update pengeluaran error:', err);
+      setError('Gagal memperbarui data pengeluaran: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -224,6 +242,13 @@ export default function PengeluaranPage() {
         },
         body: JSON.stringify({ pin: selectedPengeluaran.pin_delete })
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        setError(errorData.pesan || `HTTP error: ${res.status}`);
+        return;
+      }
+      
       const data = await res.json();
       if (data.success) {
         setSuccess('Data pengeluaran berhasil dihapus');
@@ -234,8 +259,9 @@ export default function PengeluaranPage() {
       } else {
         setError(data.pesan);
       }
-    } catch {
-      setError('Gagal menghapus data pengeluaran');
+    } catch (err) {
+      console.error('Delete pengeluaran error:', err);
+      setError('Gagal menghapus data pengeluaran: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -586,7 +612,7 @@ export default function PengeluaranPage() {
               </select>
               <input type="number" className="input-field" value={selectedPengeluaran.nominal || ''} onChange={(e) => setSelectedPengeluaran({ ...selectedPengeluaran, nominal: e.target.value })} />
             </div>
-            <input type="date" className="input-field" value={(selectedPengeluaran.tgl_keluar || '').toString().slice(0, 10)} onChange={(e) => setSelectedPengeluaran({ ...selectedPengeluaran, tgl_keluar: e.target.value })} />
+            <input type="date" className="input-field" value={selectedPengeluaran.tgl_keluar ? String(selectedPengeluaran.tgl_keluar).substring(0, 10) : ''} onChange={(e) => setSelectedPengeluaran({ ...selectedPengeluaran, tgl_keluar: e.target.value })} />
             <textarea className="input-field" value={selectedPengeluaran.catatan || ''} onChange={(e) => setSelectedPengeluaran({ ...selectedPengeluaran, catatan: e.target.value })} rows={3} />
             <input type="password" className="input-field" placeholder="PIN" value={selectedPengeluaran.pin_edit || ''} onChange={(e) => setSelectedPengeluaran({ ...selectedPengeluaran, pin_edit: e.target.value })} />
             <div className="flex gap-2">

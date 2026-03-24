@@ -17,39 +17,83 @@ async function verifyPin(adminId, pin) {
 export async function PUT(request, { params }) {
   let t;
   try {
+    console.log('[PUT /api/pengeluaran/:id] Starting update...');
     await sequelize.authenticate();
+    console.log('[PUT /api/pengeluaran/:id] Database authenticated');
+    
     const auth = await verifyAuth(request);
-    if (!auth.success) return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
+    if (!auth.success) {
+      console.log('[PUT /api/pengeluaran/:id] Auth failed:', auth.error);
+      return NextResponse.json({ success: false, pesan: auth.error }, { status: 401 });
+    }
+    console.log('[PUT /api/pengeluaran/:id] Auth success, user:', auth.user.id);
 
     const body = await request.json();
+    console.log('[PUT /api/pengeluaran/:id] Request body:', body);
+    
     const pinCheck = await verifyPin(auth.user.id, body.pin);
-    if (!pinCheck.ok) return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
+    if (!pinCheck.ok) {
+      console.log('[PUT /api/pengeluaran/:id] PIN check failed:', pinCheck.pesan);
+      return NextResponse.json({ success: false, pesan: pinCheck.pesan }, { status: pinCheck.status });
+    }
+    console.log('[PUT /api/pengeluaran/:id] PIN verified');
 
     t = await sequelize.transaction();
+    console.log('[PUT /api/pengeluaran/:id] Transaction started');
 
     const { id } = await params;
+    console.log('[PUT /api/pengeluaran/:id] Looking for pengeluaran with id:', id);
+    
     const pengeluaran = await Pengeluaran.findByPk(id, { transaction: t });
     if (!pengeluaran) {
       await t.rollback();
+      console.log('[PUT /api/pengeluaran/:id] Pengeluaran not found');
       return NextResponse.json({ success: false, pesan: 'Data pengeluaran tidak ditemukan' }, { status: 404 });
     }
+    console.log('[PUT /api/pengeluaran/:id] Pengeluaran found:', pengeluaran.toJSON());
 
     const dataSebelum = pengeluaran.toJSON();
     const nominalLama = Number(pengeluaran.nominal);
     const nominalBaru = body.nominal !== undefined ? Number(body.nominal) : nominalLama;
 
-    await pengeluaran.update({
+    // Validate nominal
+    if (isNaN(nominalBaru) || nominalBaru < 0) {
+      await t.rollback();
+      console.log('[PUT /api/pengeluaran/:id] Invalid nominal:', nominalBaru);
+      return NextResponse.json({ success: false, pesan: 'Nominal tidak valid' }, { status: 400 });
+    }
+
+    // Prepare update data
+    const updateData = {
       judul: body.judul || pengeluaran.judul,
       kategori: body.kategori || pengeluaran.kategori,
       nominal: nominalBaru,
       catatan: body.catatan !== undefined ? body.catatan : pengeluaran.catatan,
-      tgl_keluar: body.tgl_keluar || pengeluaran.tgl_keluar,
-    }, { transaction: t });
+    };
+
+    // Handle date field properly for DATEONLY type
+    if (body.tgl_keluar) {
+      // Ensure date is in YYYY-MM-DD format
+      const dateStr = String(body.tgl_keluar).substring(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        updateData.tgl_keluar = dateStr;
+        console.log('[PUT /api/pengeluaran/:id] Date formatted:', dateStr);
+      }
+    }
+
+    console.log('[PUT /api/pengeluaran/:id] Updating with data:', updateData);
+    await pengeluaran.update(updateData, { transaction: t });
+    console.log('[PUT /api/pengeluaran/:id] Update successful');
 
     const diff = nominalBaru - nominalLama;
+    console.log('[PUT /api/pengeluaran/:id] Nominal diff:', diff);
+    
     if (diff !== 0) {
+      console.log('[PUT /api/pengeluaran/:id] Creating jurnal kas adjustment...');
       const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
       const saldo = (lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0) - diff;
+      console.log('[PUT /api/pengeluaran/:id] Last jurnal saldo:', lastJurnal ? lastJurnal.saldo_berjalan : 0, 'New saldo:', saldo);
+      
       await JurnalKas.create({
         tgl_transaksi: new Date(),
         tanggal_aksi: new Date(),
@@ -60,11 +104,19 @@ export async function PUT(request, { params }) {
         saldo_berjalan: saldo,
         admin_id: auth.user.id,
       }, { transaction: t });
+      console.log('[PUT /api/pengeluaran/:id] Jurnal kas adjustment created');
     }
 
+    console.log('[PUT /api/pengeluaran/:id] Committing transaction...');
     await t.commit();
+    console.log('[PUT /api/pengeluaran/:id] Transaction committed');
+    
+    console.log('[PUT /api/pengeluaran/:id] Creating backup...');
     await createBackup('Update Pengeluaran', 'pengeluaran', dataSebelum, pengeluaran.toJSON(), auth.user.id);
+    console.log('[PUT /api/pengeluaran/:id] Backup created');
+    
     try {
+      console.log('[PUT /api/pengeluaran/:id] Sending email notification...');
       const emailTujuan = await getEmailPenerimaPerubahan(auth.user.id);
       await kirimEmailAksiAdmin({
         aksi: 'Update Pengeluaran',
@@ -74,15 +126,25 @@ export async function PUT(request, { params }) {
         adminJabatan: auth.user.jabatan,
         emailTujuan,
       });
+      console.log('[PUT /api/pengeluaran/:id] Email notification sent');
     } catch (emailErr) {
-      console.error('Gagal kirim email salinan:', emailErr);
+      console.error('[PUT /api/pengeluaran/:id] Failed to send email:', emailErr);
     }
 
+    console.log('[PUT /api/pengeluaran/:id] Success!');
     return NextResponse.json({ success: true, pesan: 'Pengeluaran berhasil diperbarui', data: pengeluaran });
   } catch (error) {
-    if (t) await t.rollback();
-    console.error('Update pengeluaran error:', error);
-    return NextResponse.json({ success: false, pesan: 'Terjadi kesalahan server' }, { status: 500 });
+    console.error('[PUT /api/pengeluaran/:id] ERROR:', error);
+    console.error('[PUT /api/pengeluaran/:id] Error stack:', error.stack);
+    if (t) {
+      console.log('[PUT /api/pengeluaran/:id] Rolling back transaction...');
+      await t.rollback();
+    }
+    return NextResponse.json({ 
+      success: false, 
+      pesan: 'Terjadi kesalahan server: ' + (error.message || 'Unknown error'),
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
   }
 }
 
