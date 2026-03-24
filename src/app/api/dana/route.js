@@ -28,6 +28,12 @@ export async function GET(request) {
     const excludeSppCancellation = {
       [Op.notLike]: 'Pembatalan pembayaran SPP%'
     };
+
+    // Exclude ADJ (adjustment) journals from total pengeluaran
+    // ADJ journals are internal accounting entries for reconciling edits, not actual expenses
+    const excludeAdjJournal = {
+      [Op.notLike]: 'ADJ-%'
+    };
     
     // Total SPP tahun ini
     const totalSPP = await PembayaranSPP.sum('nominal', {
@@ -62,6 +68,7 @@ export async function GET(request) {
         jenis: 'Keluar',
         tgl_transaksi: { [Op.between]: [startDate, endDate] },
         keterangan: excludeSppCancellation,
+        referensi_kode: excludeAdjJournal,
       },
     }) || 0;
     
@@ -77,7 +84,10 @@ export async function GET(request) {
     }) || 0;
     
     const totalPengeluaranAll = await JurnalKas.sum('nominal', {
-      where: { jenis: 'Keluar' },
+      where: { 
+        jenis: 'Keluar',
+        referensi_kode: excludeAdjJournal,
+      },
     }) || 0;
     
     // Verifikasi saldo (audit)
@@ -115,6 +125,7 @@ export async function GET(request) {
           jenis: 'Keluar',
           tgl_transaksi: { [Op.between]: [bulanStart, bulanEnd] },
           keterangan: excludeSppCancellation,
+          referensi_kode: excludeAdjJournal,
         },
       }) || 0;
       
