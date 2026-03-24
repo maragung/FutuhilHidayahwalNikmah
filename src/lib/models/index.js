@@ -82,7 +82,8 @@ BukuPrestasiSantri.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
 EmailServer.hasMany(EmailLog, { foreignKey: 'email_server_id', as: 'logs' });
 EmailLog.belongsTo(EmailServer, { foreignKey: 'email_server_id', as: 'server' });
 
-module.exports = {
+// Disable paranoid mode (soft deletes) for all models since deleted_at columns were removed
+const models = {
   sequelize,
   Admin,
   Role,
@@ -103,3 +104,12 @@ module.exports = {
   BukuPrestasiSantri,
   IdempotencyKey,
 };
+
+// Set paranoid to false for all models to disable soft deletes
+Object.values(models).forEach(model => {
+  if (model && typeof model === 'function' && model.options) {
+    model.options.paranoid = false;
+  }
+});
+
+module.exports = models;
