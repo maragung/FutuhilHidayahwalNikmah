@@ -118,7 +118,7 @@ export async function POST(request) {
         kegiatan_id: kegiatanId,
         nominal: nominalFinal,
         metode_bayar: metodeBayar,
-        createdAt: { [Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
+        created_at: { [Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
       },
       order: [['id', 'DESC']],
     });

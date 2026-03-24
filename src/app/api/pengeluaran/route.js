@@ -140,7 +140,7 @@ export async function POST(request) {
         judul: judulText,
         kategori: kategoriValue,
         nominal: nominalValue,
-        createdAt: { [Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
+        created_at: { [Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
       },
       order: [['id', 'DESC']],
     });
