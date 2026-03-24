@@ -36,11 +36,11 @@ export async function POST(request) {
 
     t = await sequelize.transaction();
 
-    // Find all ADJ jurnal entries related to pengeluaran
+    // Find all ADJ jurnal entries related to pengeluaran (including orphaned ones)
     const adjJurnals = await JurnalKas.findAll({
       where: {
         referensi_kode: {
-          [Op.like]: 'ADJ-OUT-%'
+          [Op.like]: 'ADJ-%'
         },
         keterangan: {
           [Op.like]: '%Penyesuaian pengeluaran%'
@@ -103,11 +103,11 @@ export async function GET(request) {
       );
     }
 
-    // Preview ADJ journals that will be deleted
+    // Preview ALL ADJ journals related to pengeluaran (including orphaned)
     const adjJurnals = await JurnalKas.findAll({
       where: {
         referensi_kode: {
-          [Op.like]: 'ADJ-OUT-%'
+          [Op.like]: 'ADJ-%'
         },
         keterangan: {
           [Op.like]: '%Penyesuaian pengeluaran%'

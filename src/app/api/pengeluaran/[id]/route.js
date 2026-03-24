@@ -291,9 +291,27 @@ export async function DELETE(request, { params }) {
 
     const dataSebelum = pengeluaran.toJSON();
 
+    // Delete any ADJ journals related to this pengeluaran first (cleanup from previous edits)
+    const adjJournals = await JurnalKas.findAll({
+      where: {
+        referensi_kode: {
+          [Op.like]: `ADJ-${pengeluaran.kode_pengeluaran}%`
+        }
+      },
+      transaction: t
+    });
+    
+    for (const adjJournal of adjJournals) {
+      await adjJournal.destroy({ transaction: t });
+    }
+    
+    if (adjJournals.length > 0) {
+      console.log(`[DELETE] Cleaned up ${adjJournals.length} ADJ journals for pengeluaran ${pengeluaran.id}`);
+    }
+
     // Use the expense date for the reversal entry, not today's date
     const tglPembatalan = pengeluaran.tgl_keluar ? new Date(pengeluaran.tgl_keluar) : new Date();
-    
+
     const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
     const saldo = (lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0) + Number(pengeluaran.nominal);
 
