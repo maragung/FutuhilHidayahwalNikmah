@@ -87,16 +87,19 @@ export async function PUT(request, { params }) {
 
     const diff = nominalBaru - nominalLama;
     console.log('[PUT /api/pengeluaran/:id] Nominal diff:', diff);
-    
+
     if (diff !== 0) {
       console.log('[PUT /api/pengeluaran/:id] Creating jurnal kas adjustment...');
       const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
       const saldo = (lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0) - diff;
       console.log('[PUT /api/pengeluaran/:id] Last jurnal saldo:', lastJurnal ? lastJurnal.saldo_berjalan : 0, 'New saldo:', saldo);
-      
+
+      // Use the expense date for the adjustment entry, not today's date
+      const tglPenyesuaian = pengeluaran.tgl_keluar ? new Date(pengeluaran.tgl_keluar) : new Date();
+
       await JurnalKas.create({
-        tgl_transaksi: new Date(),
-        tanggal_aksi: new Date(),
+        tgl_transaksi: tglPenyesuaian,
+        tanggal_aksi: tglPenyesuaian,
         jenis: diff >= 0 ? 'Keluar' : 'Masuk',
         nominal: Math.abs(diff),
         referensi_kode: buildSafeJurnalRef('ADJ', pengeluaran.kode_pengeluaran, pengeluaran.id),
@@ -170,12 +173,15 @@ export async function DELETE(request, { params }) {
 
     const dataSebelum = pengeluaran.toJSON();
 
+    // Use the expense date for the reversal entry, not today's date
+    const tglPembatalan = pengeluaran.tgl_keluar ? new Date(pengeluaran.tgl_keluar) : new Date();
+    
     const lastJurnal = await JurnalKas.findOne({ order: [['id', 'DESC']], transaction: t, lock: t.LOCK.UPDATE });
     const saldo = (lastJurnal ? Number(lastJurnal.saldo_berjalan) : 0) + Number(pengeluaran.nominal);
 
     await JurnalKas.create({
-      tgl_transaksi: new Date(),
-      tanggal_aksi: new Date(),
+      tgl_transaksi: tglPembatalan,
+      tanggal_aksi: tglPembatalan,
       jenis: 'Masuk',
       nominal: Number(pengeluaran.nominal),
       referensi_kode: buildSafeJurnalRef('REV', pengeluaran.kode_pengeluaran, pengeluaran.id),
