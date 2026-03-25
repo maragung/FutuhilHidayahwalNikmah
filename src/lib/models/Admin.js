@@ -109,4 +109,12 @@ Admin.prototype.validPin = async function(pin) {
   return bcrypt.compare(pin, this.pin);
 };
 
+// Exclude sensitive fields from toJSON
+Admin.prototype.toJSON = function() {
+  const values = { ...this.get() };
+  delete values.pin;
+  delete values.password;
+  return values;
+};
+
 module.exports = Admin;
